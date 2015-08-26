@@ -1,0 +1,2737 @@
+############################################################
+# This file is intended to contain all the functions 
+# we write for CANTRANce, which will be compiled into 
+# the cantrance R package. 
+#
+# Comments are in the style of the inlinedocs package
+# instructions, in order to automate generation of 
+# R help files
+#
+# Functions are organized by sections denoted using lines of
+# @@@
+# 
+# Functions themselves are separated by lines of 
+# #### and the function names are preceded by double pounds
+# (e.g. ## myfunction) for search purposes
+#
+# JKB 2/4/2013
+############################################################
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS 
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+# These functions are used across areas of CANTRANce
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - DATA MANIPULATION
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+## aggregate_by_indicator
+############################################################
+
+aggregate_by_indicator = function#Aggregate a matrix by levels of an indicator matrix
+
+##description<< Summarize matrix columns by levels of an indicator variable 
+## that is also specified in a matrix, because its levels are different for 
+## different columns
+
+(data,
+    ### Matrix of values to be summarized
+ column_name = "Column",
+    ### What do the columns of the data represent?
+ indicator,
+    ### Matrix of indicator values. Can be character strings
+ indicator_name = "Indicator",
+    ### What is the indicator?
+ fun
+    ### Summary function, e.g. "sum", "mean"
+ ){
+    summary = lapply(1:ncol(data),
+                  function(x) {
+                      return = aggregate(data[,x], 
+                                         by=list(indicator[,x]),
+                                FUN=eval(parse(text=fun)))
+                      return = data.frame(return,
+                                          Column=rep(x,nrow(return)))
+                  })
+    summary = do.call("rbind", summary)
+
+    # Data frame names
+    colnames(summary)[which(colnames(summary)=="Group.1")] = indicator_name
+    colnames(summary)[which(colnames(summary)=="Column")] = column_name
+
+    return(summary)
+
+### A data frame of the summary statistic, reported by indicator 
+### level and by column #
+}
+
+############################################################
+## aggregate_by_indicator_and_year
+############################################################
+
+aggregate_by_indicator_and_year = function# Aggregate a matrix by levels of an indicator matrix separately by year
+
+##description<< Summarize matrix columns by levels of an indicator variable 
+## that is also specified in a matrix, because its levels are different for 
+## different columns, but do so BY YEAR. This assumes that the values in the
+## data matrix are life-years, and that the user wants to separate out the 
+## summary by year
+
+(data,
+    ### Matrix of values to be summarized
+ column_name = "Column",
+    ### What do the columns of the data represent?
+ indicator,
+    ### Matrix of indicator values. Can be character strings
+ indicator_name = "Indicator",
+    ### What is the indicator?
+ fun,
+    ### Summary function, e.g. "sum", "mean"
+ timehorizon
+    ### What is the time horizon? Only years between time=0 and
+    ### this number will be summarized; years beyond will be discarded
+ ){
+    # Make a matrix of year indicators according to the time horizon
+    yearindicator = t(replicate(nrow(data),1:timehorizon))
+
+    summary = lapply(1:ncol(data),
+                  function(x, 
+                           tmax=timehorizon,
+                           yrind=yearindicator) {
+                      # Expand each person's life-years into
+                      # and indicator of alive or dead by year,
+                      # up to the max timehorizon. The indicator 
+                      # will contain a fraction if the person lived
+                      # a fraction of that year.
+                      expandlifeyr = replicate(tmax,data[,x])
+
+                      expandlifeyr = ifelse(expandlifeyr>yrind,
+                                            1,
+                                            ifelse(yrind-expandlifeyr<1,
+                                                   expandlifeyr-(yrind-1),
+                                                   0))
+                      return = aggregate(expandlifeyr,
+                                         by=list(indicator[,x]),
+                                FUN=eval(parse(text=fun)))
+                      return = data.frame(return,
+                                          Column=rep(x,nrow(return)))
+                  })
+    summary = do.call("rbind", summary)
+
+    # Data frame names
+    colnames(summary)[which(colnames(summary)=="Group.1")] = indicator_name
+    colnames(summary)[which(colnames(summary)=="Column")] = column_name
+
+    return(summary)
+
+### A data frame where years are columns and values are the summary
+### statistic, by indicator and column # (in the original data)
+}
+
+############################################################
+## name_strata
+############################################################
+
+name_strata = function# Make covariate combination indicators
+
+##description<< Determine the covariate combinations in the population  
+##and the data. This function specifies them in the way that will 
+##match the results of survfit
+
+(data=pop[,covars], 
+    ### A data frame or matrix of covariates to determine 
+    ###combinations of
+cov=covars
+    ### A vector of covariate names
+) {
+    # Turn factors in data into strings
+    data = as.data.frame(data, stringsAsFactors=FALSE) 
+    if (ncol(data)==1) colnames(data) = cov
+    cdata = apply(data, 2, function(x) { 
+        if (is.factor(x)) {
+            return(levels(x)[unclass(x)]) 
+        } else return(x) 
+        } ) 
+    # Now create a stratum name for each person that is in the 
+    # pattern of the survfit naming scheme
+    test = apply(cdata, 1, FUN=function(x) { 
+        paste(paste(paste(names(x),"=",sep=""),
+        as.character(x),sep=""), collapse=", ") 
+        })
+
+### A vector of character indicators for the covariate combinations,
+### styled to match those generated by survfit
+}            
+
+
+############################################################
+## data_info
+############################################################
+
+data_info = function# Collects some basic information about the user data
+
+##description<< Tailored to examples (e) and (d) and needs to be generalized
+(data, 
+    ### Data frame
+covars=NULL, 
+    ### Default used to be ttr_covars
+    ### Names of continuous variables in the data frame
+tabvars=NULL,
+    ### Names of categorical variables 
+rx.order=unique(survival_specs$rx)
+    ### Order of comparison (treatment) groups
+) {
+    
+    if (is.null(tabvars)) {
+        # First compute person-time by treatment group
+        pt = pyears(Surv(time, status)~rx, data=data)
+        pt = with(pt, rbind(n, event, pyears, event/pyears))
+        rownames(pt) = c("N", "Events", "Person-Time", "Incidence")
+        pt = round(pt[,rx.order], 3)
+    } else {
+        # Statistics more useful for model (d):
+        if (length(tabvars)<3) pt = table(data[,tabvars])
+        if (length(tabvars)==3) {
+            pt = data.frame(ftable(data[,tabvars])) 
+            pt = pt[order(pt[,tabvars[1]]),]        
+        }
+    }
+   
+    # Now return summary statistics by covariate 
+    if (!is.null(covars)) {
+        simple.stats = function(covar) {
+            if (is.numeric(covar) & length(unique(covar))>5) {
+                return(rbind(summary(covar)["Mean"]))
+            } else {
+                return(rbind(table(covar)))
+            }
+        }
+        s = lapply(covars[!covars%in%"rx"], function(x, d=data) {
+            r = simple.stats(d[,x])
+            if (length(r)>1) colnames(r) = paste(x, colnames(r), sep="_")
+            if (length(r)==1) colnames(r) = paste(x, "mean", sep="_")
+            return(t(r))
+            })
+        stats = do.call("rbind", s)
+        colnames(stats) = "N/Mean"
+    } else { stats=NULL }
+    return(list(pt=pt, stats=stats))
+    ### List of: 1) person-time or contingency table 2) N/mean
+}
+
+
+############################################################
+## convert_to_years
+############################################################
+
+convert_to_years = function# Convert to years from other units
+##description<< Converts from years, months, days, or hours
+(x, 
+    ### A numeric vector
+ from="days"
+    ### One of "years", "months", "days", or "hours"
+) {
+    switch(from, days=x/365, months=x/12, hours=x/(365*24), years=x)
+    ### Numeric vector
+}
+
+############################################################
+## comparevals
+############################################################
+
+
+comparevals = function# Returns the min or max of values in comparable matrices
+##description<< Compares matrix elements and returns either the min or max values
+(mat1, 
+    ### An n by p matrix
+mat2, 
+    ### An n by p matrix
+fun="min"
+    ### Values to return: one of "min" or "max"
+) {
+    # Convert to matrices if necessary
+    if (is.data.frame(mat1)) mat1 = as.matrix(mat1)
+    if (is.data.frame(mat2)) mat2 = as.matrix(mat2)
+    # Check dimensions
+    if (sum(dim(mat1)!=dim(mat2))>0) {
+        cat("Matrices not of same dimensions\n")
+        stop()
+    }
+    # Return either min or max
+    if (fun=="min") return(ifelse(mat1<mat2, mat1, mat2))
+    if (fun=="max") return(ifelse(mat1>mat2, mat1, mat2))    
+### A matrix of either the min or max values of the two input matrices
+}
+
+
+############################################################
+## combinepops
+############################################################
+
+combinepops = function# Combine two data frames or matrices with rbind
+##description<< Combine data frames/matrices and create an indicator variable to distinguish the data. The indicator can be returned separately if keeping the data as a matrix. 
+(list, 
+    ### A list of data frames to be combined
+ varname, 
+    ### Name for the new indicator variable
+ values=NULL, 
+    ### Vector of values for the indicator, in the same order as the df's
+ df=TRUE
+    ### Return a data frame with the indicator appended? 
+ ) {
+    # If values for the indicator are not specified,
+    # just use the list index as the indicator
+    if (is.null(values)) values = 1:length(list)
+
+    # Stop if there aren't the same number of list 
+    # elements and values
+    if (!is.null(values)) {
+        if (length(list)!=length(values)) stop("ERROR in combinepops")
+    }
+
+    if (df) {
+        # Create the new variable in each data frame
+        sapply(1:length(list), FUN=function(x) {
+            list[[x]] = as.data.frame(list[[x]])
+            list[[x]][,varname] = rep(values[x], nrow(list[[x]]))
+            list[[x]] <<- list[[x]]
+            return(NULL)
+        })
+        
+        # Rbind
+        return(do.call(rbind, list))
+    } else {
+        data = do.call(rbind, list)
+        indicator = lapply(1:length(values), function(x) {
+            rep(values[x], nrow(list[[x]])) 
+            })
+        indicator = do.call(c, indicator)
+        return(list(d=data, i=indicator))
+    }
+### Either a data frame with the indicator as a new variable, or a list of 1) the data as a matrix and 2) the indicator as a vector
+}
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - BOOTSTRAPPING
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+## bootstrap_rows
+############################################################
+
+# Updated 4/23/12
+
+# Returns a dataset with nsim row indicators appended, for
+# constructing bootstrapped datasets
+
+bootstrap_rows = function# Bootstraps datasets and returns the row numbers (not names) for each sample, instead of the actual datasets
+
+##description<< Takes a dataset, resamples the specified number
+##of times with replacement, and returns the dataset along 
+##with the resampled row numbers.
+
+(data, 
+    ### A data frame that has columns sim1...simX indicating
+    ### rows for X bootstrapped datasets
+n_sim, 
+    ### Number of treatment assignments to bootstrap
+prefix="sim",
+    ### Prefix for the names of each bootstrapped dataset
+return_data=TRUE
+    ### If false, only the row indicators will be returned;
+    ### default is to also return the data
+) {
+
+    # Sample row numbers nsim times for constructing nsim datasets
+    rows = replicate(nsim, sample.int(nrow(data),
+                                      nrow(data), replace=TRUE))
+    colnames(rows) = paste(prefix, 1:nsim, sep="")
+
+    if (return_data) toreturn = data.frame(data,rows) else toreturn=rows
+    return(toreturn)
+
+### The input data with additional columns indicating nsim bootstrapped datasets, where the variable indicated by prefix contains row numbers for constructing the bootstrapped datasets
+}
+
+
+############################################################
+## bootstrap_pop
+############################################################
+
+bootstrap_pop = function# Boostrap a population from a data set
+
+##description<< Creates a population by bootstrapping from the data. For covars_specified, requires a covar_table data frame with columns "var1", "var2"..."varN", "size".  The size indicates how many observations will be returned for each combination of var1...varN.  
+
+(data=userdat, 
+    ### Data frame
+size=pop_size, 
+    ### Size of boostrapped population
+how=create_pop_method, 
+    ### One of "simple_boostrap" (resamples rows randomly) or "covars_specified," which resamples rows according to the sample sizes indicated in covar_table
+covar_table=NULL
+    ### Data frame with columns var1...varN, size. Size indicates how many observations will be returned for the row's combination of variable values.
+) {
+    if (how=="simple_bootstrap") {
+        if (size!=nrow(data)) {
+            return(data[sample(rownames(data),replace=TRUE,size=pop_size),])
+        } else {
+            return(data)
+        }
+    }        
+    if (how=="weighted_bootstrap") {
+        warning("This option requires you specify covar_table")
+        # Identify variables of interest and create an indicator for 
+        # unique groups
+        byvars = colnames(covar_table)[-which(colnames(covar_table)=="size")]
+        groups = apply(as.data.frame(covar_table[,byvars]), 
+                       1, paste, collapse="-")
+        # Use ddply to split the population into the groups
+        # defined by the covar combinations in covar_table. 
+        # Then use the size specified in covar_table to 
+        # sample from the data
+        newpop = ddply(data, byvars, function(x) {
+            # Get id and sample size for that id
+            id = which(paste(x[1,byvars],collapse="-")==groups)
+            thissize = covar_table[id,"size"]
+            # Sample that many rows from this subset of the data
+            theserows = sample(rownames(x),thissize,replace=TRUE)
+            return(x[theserows,])
+            })
+        return(newpop)
+    }
+### A data frame of size pop_size
+}
+    
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - DETERMINE SURVIVAL PARAMETERS
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+## get_lambda
+############################################################
+
+get_lambda = function#Takes in parameter info for an exponential and returns the rate(s)
+##description<<Custom; expects a specific data frame format
+(param_info,
+    ### Data frame where columns are stats by which the rate
+    ### may be specified. First column must be "times", 
+    ### indicating the times at which the hazard changes for
+    ### an exponential. 
+ k=NA
+    ### Specify if parameter is given as a k-year survival
+    ### Vector of same length as the non-NA entries in "kysurv"
+    ### in the param_info data frame
+) {
+        # Which stat is specified? It's the one where
+        # all the entries are NOT all NA
+        stat = names(param_info)[!names(param_info)%in%"times"]
+        # Get lambda
+        if (stat=="median") lambda = log(2)/param_info[,stat]
+        if (stat=="mean") lambda = 1/param_info[,stat]
+        if (stat=="kyrsurv") lambda = -log(param_info[,stat])/k
+        if (stat=="rate") lambda = param_info[,stat]
+        # Return
+        param_info$rate = lambda
+        return(param_info)
+}
+
+
+############################################################
+## get_lambda_simp
+############################################################
+
+get_lambda_simp = function#Takes in parameter info for an exponential and returns the rate(s). Simpler version of get_lambda().
+##description<<Custom; expects a specific data frame format
+(stat,
+    ### String specifying the type of statistic to be used
+    ### in the construction of the exponential curve. May 
+    ### be 'rate', 'median', 'mean', or 'kyrsurv'.
+ values,
+    ### Data frame. First column must be 'times', indicating
+    ### the times at which the hazard changes for an
+    ### exponential curve. Second column must be 'stat',
+    ### which gives the value(s) for the chosen statistic at
+    ### each time.
+ k=NA
+    ### If 'stat' is 'kyrsurv', give year for k-year survival.
+) {
+    # Calculate lambda from provided statistics
+    values$rate =  switch(stat,
+                          median = log(2)/values[, 'stat'],
+                          mean = 1/values[, 'stat'],
+                          kyrsurv = -log(values[, 'stat'])/k,
+                          rate = values[, 'stat'])
+
+    # Return data frame with times at which the hazard changes,
+    # and the corresponding rates.
+    return(subset(values, select=c(times, rate)))
+}
+
+
+############################################################
+## calc_HR
+############################################################
+
+calc_HR = function#Calculate total HR based on covariate HRs
+
+##description<< Matches covariate HRs to each person's covariates,
+## and multiples to calculate the total HR. The input data 
+## structures are a bit particular. Expects multiple simulations.
+
+(data,
+    ### Matrix/df of data with observations as rows, and 
+    ### columns containing covariate data
+ bootrows,
+    ### Matrix/df of row indicators that can be applied to
+    ### the data to recover different bootstraps of the data.
+    ### Each column is a different bootstrap of the data
+ additional_data=NULL,
+    ### Matrix/df of same dimensions as bootrows. Contains
+    ### additional data corresponding to each dataset
+    ### indicated by bootrows
+ additional_data_name=NULL,
+    ### Name of the data described in additional_data
+ covar_list,
+    ### List of which each element is a data frame
+    ### containing covariate combinations and the 
+    ### corresponding HR
+ id_cols=1:2    
+    ### Which columns in the data frames in covar_list
+    ### are ID columns? Specify column indexes
+ ){
+
+    # If there are no covariates to modify the baseline,
+    # then just return a matrix of 1's
+    if (is.null(covar_list)) {
+        total_HR = matrix(1,
+                       nrow=nrow(bootrows),
+                       ncol=ncol(bootrows))
+    } else {
+        # Helper function for one simulation
+        calc_HR_onesim = function(simdata,covar_list) {
+            HRs = sapply(covar_list, function(l) {
+                        # Preserve row order
+                        simdata$rowid = 1:nrow(simdata)
+
+                        # If the covariate is a factor,
+                        # then column 1 will not have NAs
+                        if (sum(is.na(l[,1]))==0) {
+                            # Merge on HRs
+                            m = merge(simdata,l,
+                                      by=colnames(l)[id_cols],
+                                      all.x=TRUE)
+                        } else {
+                            # Get the continuous covariate name
+                            thisvar = colnames(l)[1]
+                            # Merge on HRs, which are not
+                            # unique to continuous covariate values YET
+                            m = merge(simdata,l[,-1],
+                                      by=colnames(l)[
+                                            id_cols[-which(id_cols==1)]],
+                                      all.x=TRUE)
+                            # Get the HRs corresponding 
+                            # to the continuous covariate value
+                            m$HR = m$HR^m[,thisvar]
+                        }
+                        # Resort and return
+                        m = m[order(m$rowid),]
+                        return(m$HR)
+            })
+        }
+
+        # For each simulation, recreate the bootstrapped data,
+        # get the HRs for each covariate, and then multiply them 
+        # to get the total HR
+        total_HR = sapply(1:ncol(bootrows),
+                          function(x) {
+                              simdata = data[bootrows[,x],]
+                              if (!is.null(additional_data)) 
+                                  simdata[,additional_data_name] = 
+                                    additional_data[,x]
+                              HRs = calc_HR_onesim(simdata,
+                                                   covar_list)
+                              total_HR = apply(HRs,1,prod)
+                              return(total_HR)
+                          })
+
+    }
+    return(total_HR)
+
+### A matrix of total HRs for each observation under each simulation.
+### Thus, has the same dimensions as the input matrix "bootrows"
+}
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - SURVIVAL SIMULATION
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+## sim_KM
+############################################################
+
+sim_KM = function# Returns random deviates from a survival curve
+##description<< Takes in event times and corresponding survival probs (as from a KM curve) and returns n random deviates
+(survival, 
+    ### Vector of survival probabilities, as from a KM curve
+time, 
+    ### Vector of event times corresponding to the survival probabilities
+smalltimes, 
+    ### Value to be returned if survival is higher/time is smaller than any observed. Suggestions: o, min(times), NA
+bigtimes, 
+    ### Value to be returned if survival is lower/time is higher than any observed. Suggestions: Inf, max(times), NA
+nsims,
+    ### Number of deviates to return
+mindraw=0, 
+    ### Minimum draw allowed on the survival scale
+maxdraw=1, 
+    ### Maximum draw allowed on the survival scale
+draws=NULL
+    ### If draws on the survival scale have already been made, specify as a vector here
+) {
+
+    # Take n_sim random draws between 0 and 1
+    if (is.null(draws)) draws = runif(nsims, min=mindraw, max=maxdraw)
+    
+    # Now get the corresponding times 
+    ##note<< Uses a linear approximation to interpolate between observed events
+    ttrs <- approx(x=survival, y=time, method="linear", 
+        xout=draws, yleft=smalltimes, yright=bigtimes)[['y']]
+
+    return(ttrs)
+### Times to event representative of the input curve
+}
+
+
+############################################################
+## sim_exp_conditional
+############################################################
+
+sim_exp_conditional = function# Returns random deviates from an exponential distribution for a population with varying rates
+##description<< Rates may be conditional on some covariate like treatment, which may be different across sims for a given person
+(pop, 
+    ### Data frame/matrix with multiple sims of the covariate, stored in columns indicated by "prefix." Rows are individuals in a population
+prefix="sim", 
+    ### Prefix (a string) that identifies multiple columns of sims
+rx=NULL, 
+    ### Name of ovariate across which rates may vary. The prefix columns should contain sims of values of this covariate
+stat="median", 
+    ### One of "rate", "mean", "median", or "kyrsurv" that identifies how the rate parameter is specified
+k=NULL, 
+    ### If "kyrsurv" is chosen for "stat", the number of years (i.e. k=10 means 10-year survival)
+params, 
+    ### Vector of rate parameters, one for each value of the rx covariate
+distr="exponential", 
+    ### I think I should delete this
+n_sim=nsim, 
+    ### Number of deviates to return per person
+newprefix=NULL
+    ### Prefix to use to identify the columsn of returned deviates
+) {
+
+    # Take n_sim draws from the distribution for each person
+    # Allow the distribution parameter to vary based on treament
+    if (distr=="exponential") {
+
+        # Get lambda, and label it with the treatment names
+        if (stat=="median") lambda = log(2)/params
+        if (stat=="mean") lambda = 1/params
+        if (stat=="kyrsurv") lambda = -log(params)/k
+        if (stat=="rate") lambda = params
+
+        # Function to generate n_sim deviates for each rate
+        get_deviates = function(rate, n=n_sim) {
+            return(rexp(n, rate=rate))
+        }
+
+        # If there is only one parameter, generate deviates
+        # using just that one value. Otherwise, generate 
+        # different deviates by rx group
+        if (length(params)==1) {
+            times = matrix(get_deviates(lambda, nrow(pop)*n_sim),
+                nrow=nrow(pop))
+        } else {
+            # Attach names to parameters
+            if (!is.null(rx)) {
+                names(lambda) = rx
+            } else {
+                cat("Need list of rx names corresponding to parameters")
+                break
+            }
+
+            # Template matrix for results
+            times = matrix(NA, nrow=nrow(pop), ncol=n_sim)
+
+            # Counts of people by rx
+            popvals = pop[, grep(prefix, colnames(pop))]
+            rxtab = table(c(as.matrix(popvals)))
+
+            # Generate the appropriate number of deviates for 
+            # each rate, and store in the right spots in "times"
+            storetimes = lapply(names(rxtab), FUN=function(x) {
+                vals = matrix(get_deviates(lambda[x], n=n_sim*nrow(pop)),
+                    nrow=nrow(pop)) 
+                times <<- ifelse(popvals==x, vals, times)
+                })
+        }
+        if (!is.null(newprefix)) colnames(times) = paste(newprefix,
+            1:n_sim, sep="")
+        return(times)
+
+    } else {
+        return("Only coded for the exponential distribution so far")
+    }
+### Matrix of random deviates, with rows corresponding to rows of the input population
+}
+
+
+############################################################
+## sim_piecewiseexp_HRs
+############################################################
+
+sim_piecewiseexp_HRs = function# Returns random deviates from a regular or piecewise exponential distribution for a population with varying rates, specified by HRs
+##description<< Rates are specified as baseline hazard(s) and hazard ratios
+(baseline_rates, 
+    ### Data frame of rates specifying the baseline hazards (column name "rate") and changepoints (column name "times"). Nrow = 1 if using a regular exponential 
+HRs,
+    ### Matrix/df of HRs to be applied 
+prefix=NA
+    ### Specify a prefix to apply to the sim number for column names?
+) {
+    # NEW CODE
+    # Unique HRs and their counts
+    unique_HRs = unique(as.vector(HRs))
+    table_HRs = sapply(unique_HRs, function(x) sum(HRs==x))
+    
+    # Simulate and insert into appropriate cells of the
+    # results matrix "sims_matrix"
+    sims_matrix = matrix(NA,nrow=nrow(HRs),ncol=ncol(HRs))
+    sims = lapply(1:length(unique_HRs), 
+                  function(x) {
+                      sims = rpexp(table_HRs[x],
+                                   rate=baseline_rates$rate*unique_HRs[x],
+                                   t=baseline_rates$times)
+                      sims_matrix[HRs==unique_HRs[x]] <<- sims
+                  } )
+    if (sum(is.na(sims))!=0) stop("in sim_piecewise_exp, a problem!")
+
+        # Note, this actually works! Try it with a simple example:
+        if (1==0) {
+            test = cbind(c(1,2,3,4),c(4,3,2,1))
+            replace_test_1 = c(8,0)
+            test[test==1] <- replace_test_1
+        }
+
+    # OLD CODE
+if (1==0) {
+    # Turn the matrix into a list temporarily
+    # The order is it goes down rows, then the next column. 
+    # So the list is in order col1 values, col2 values..etc
+    HRlist = as.list(HRs)
+
+    # Now simulate one value from the exponential distribution
+    # witht the correct HR
+    sims = rapply(HRlist, function(hr) {
+                  rpexp(1,rate=baseline_rates$rate*hr,
+                        t=baseline_rates$times)
+            })
+    sims_matrix = matrix(sims,nrow=nrow(HRs),byrow=FALSE)
+}
+
+    if (!is.na(prefix)) colnames(sims_matrix) = paste(prefix, 1:ncol(sims_matrix), sep="")
+
+    return(sims_matrix)
+
+### Matrix of random deviates of the same dimension as the HRs matrix
+}
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - OTHER-CAUSE DEATH
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+## calc_ac_lifespan
+############################################################
+    
+calc_ac_lifespan <- function# Generates an age at other-cause death from US lifetables
+
+##description<< Given a year of birth and current age, draws 
+##a random age at other-cause death from US cohort lifetables. 
+##Assumes that lifetable data are stored in a data frame 
+##'life_table' with columns Survival, BirthCohort, Age, and Male
+
+(age, 
+    ### Current age
+birth_year, 
+    ### Year of birth
+male, 
+    ### Sex: male=1 for male, male=0 for female
+n_sim=100, 
+    ### Number of random draws to return
+time=FALSE,
+    ### Return age at other-cause death, or time from current
+    ### age to other-cause death?
+haz=NULL
+    ### Should the US lifetables be modified by a hazard ratio 
+    ### before drawing from them? If so, the cohort survival will be 
+    ### raised to this number. 
+) {
+
+    # If there is a hazard modifier, apply it
+    if (!is.null(haz)) life_table$Survival = life_table$Survival^(haz)
+    
+    # Subset data to specified birth cohort
+    surv <- life_table[
+        life_table[['BirthCohort']]==birth_year & life_table$Male==male,
+        c('Age','Survival')]
+    
+    # Get the max cumulative survival for specified age 
+    maxu <- surv[surv[['Age']] == age, 'Survival']
+    
+    # Take random draws between 0 and the survival probability
+    # Because this is cumulative survival, 0 survival corresponds 
+    # to the upper bound for age at death
+    # Then linearly interpolate between age and survival estimates
+    # and determine the age the corresponds to the draw
+    # Use 120 as the maximum age possible (survival=0)
+    death <- with(surv, sim_KM(Survival, Age, smalltimes=age,
+        bigtimes=120, nsims=n_sim, mindraw=0, maxdraw=maxu))
+    
+    # Convert the age into a time from entry age until death?
+    if (time==TRUE) death = death-rep(age,n_sim)
+    if (sum(is.na(death))!=0) browser()
+    if (sum(death==0)!=0) browser()
+    return(death)
+
+### A vector of length n_sim containing ages at other-cause death (or times to other-cause death, if time=TRUE)
+}
+
+############################################################
+# calc_ac_lifespan_pop
+############################################################
+
+calc_ac_lifespan_pop = function# Use the individual calc_ac_lifespan function to estimate lifespans of a population
+
+##description<< Given a population with birth years and ages, 
+##returns random draws of their ages at other-cause death
+
+(pop, 
+    ### Data frame where individuals are rows, with columns 
+    ### birth_year, age, and male
+boot = FALSE,
+    ### Does the pop dataset also have rows "sim1"..."simX"
+    ### that indicate rows for X bootstrapped datasets? If TRUE,
+    ### birth year and age will be different for each sim
+nsim, 
+    ### Number of random draws to return
+results_as_matrix=FALSE
+    ### Convert the results from a data frame to a matrix?
+) {
+    # Load life table data
+    if (!"life_table"%in%ls()) data(life_table)
+
+    # Generate a tempid that we will use to return the 
+    # pop to its original sort order
+    pop$tempid = 1:nrow(pop)
+    
+    if (!boot) {
+        # Use ddply to split the population into groups that
+        # have the same age, birth year, and sex. Then use 
+        # calc_ac_lifespan to generate nsim*(num ppl in this age-
+        # birth-year group) values of age at OC death.
+        # ddply takes the results and combines back into a dataframe.
+        newpop = ddply(pop, .(age,birth_year,male), function(x) {
+            age = min(x$age)
+            birth_year = min(x$birth_year)
+            male = min(x$male)
+            #cat(age,birth_year,male,"\n")
+            if (is.data.frame(x)) nrow=nrow(x) else nrow=1
+            ageOCs = calc_ac_lifespan(age, birth_year, male, nsim*nrow)
+            ageOCs = data.frame(x,matrix(ageOCs,nrow=nrow,ncol=nsim))
+            return(ageOCs)
+            })
+
+        # Return to original sort order
+        newpop = newpop[order(newpop$tempid),]
+        newpop$tempid = NULL
+
+    } else {
+        newpop = sapply(1:nsim, function(y) {
+            # Construct the dataset
+            thisboot = pop[pop[,paste("sim",y,sep="")],
+                           c("age","birth_year","male")]
+            thisboot$tempid = 1:nrow(thisboot)
+            # Simulate ages at other-cause death
+            ocs = ddply(thisboot, .(age,birth_year,male), function(x) {
+                # Extract age, birth year, and male specifications
+                age = min(x$age)
+                birth_year = min(x$birth_year)
+                male = min(x$male)
+                #cat(age,birth_year,male,"\n")
+
+                # Calculate all-cause lifespan
+                if (is.data.frame(x)) nrow=nrow(x) else nrow=1
+                ageOCs = calc_ac_lifespan(age, birth_year, male, nrow)
+                ageOCs = data.frame(x,ageOC=matrix(ageOCs,nrow=nrow,ncol=1))
+                return(ageOCs)
+                })
+            # Return to original sort order, and return ageOC
+            # this bootstrapped dataset
+            ocs = ocs[order(ocs$tempid),]
+            return(ocs$ageOC)
+            })
+    }
+    
+    # Return results as a matrix?
+    if (results_as_matrix) {
+        if (!boot) newpop = newpop[,(ncol(newpop)-nsim+1):ncol(newpop)]
+        colnames(newpop) = 1:nsim
+        newpop = as.matrix(newpop)
+    }
+
+    return(newpop)
+
+### A data frame or matrix with nsim columns of randomly drawn ages at other-cause death for individuals (rows)
+}
+
+
+############################################################
+# calc_ac_lifespan_convert
+############################################################
+
+# Just converts between age at OC death and time to OC death
+# Choose between from="age" and from="time"
+# Expects that rows are people in ocmat; age is a vector
+# of their ages
+
+calc_ac_lifespan_convert = function# Convert between age at other-cause death and time to other-cause death
+
+##description<< Based on age at start of study, convert between the age time scale and study time scale
+
+(ocmat,
+    ### Matrix of times. Rows are individuals
+age,
+    ### Vector or matrix of ages at study start
+from
+    ### Either "age" or "time"
+) {
+    if (from=="age") {
+        ocmat = ocmat-age
+    } else if (from=="time") {
+        ocmat = ocmat+age
+    } else {
+        cat("Incorrect specification\n")
+        stop()
+    }
+    return(ocmat)
+### Matrix of same dimensions as ocmat
+}
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - SUMMARIZING RESULTS
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+# cancer_death
+############################################################
+
+cancer_death = function# Determine time from study start to cancer death
+
+##description<< Adds times from study segments to calculate time
+##from start of study to death from cancer
+
+(data=ttcd, 
+    ### Matrix of times from intermediate point (e.g. recurrence)
+    ### to cancer death and times from study start to intermediate
+    ### point
+healthy_recur="ttr", 
+    ### Prefix that identifies times from study start to intermediate
+    ### point
+recur_death="ttcd", 
+    ### Prefix that identifies times from intermediate point to 
+    ### cancer death
+units="days", 
+    ### Time units: one of "years", "months", "days", or "hours"
+agevar="age", 
+    ### Name of the age variable OR a matrix of ages
+time=FALSE
+    ### If age at death is preferable to time from study start to 
+    ### death, choose time=FALSE
+) {
+
+    # Add the times to recurrence and recurrence to death
+    time_to_death = data[,grep(healthy_recur, colnames(data))] + 
+        data[,grep(recur_death, colnames(data))]
+        
+    # Convert to years
+    time_to_death = convert_to_years(time_to_death, from=units)
+
+    # Return, or calculate age at death
+    if (time==TRUE) {
+        return(time_to_death)
+    } else {
+        # Calculate age at death and return
+        # If age is constant across a row
+        if (is.null(dim(agevar))) {
+            age_at_death = time_to_death + data[,agevar]
+        } else {
+        # If it's not
+            age_at_death = time_to_death + agevar
+        }
+        return(age_at_death)
+    }
+
+### Matrix of times to death or ages at death
+}
+
+############################################################
+## summarize_ecdf
+############################################################
+
+summarize_ecdf = structure(function#Summarize multiple empirical cdfs by covariate groups
+
+##description<< Compute the empirical cdf of a distribution for multiple simulations and return the distribution of medians and a summary of the cdfs at each of the specified "xvalues"
+    
+(data, 
+    ### A matrix where columns are different simulations of the data 
+    ### distribution and rows are individuals
+xvalues=seq(0,10,0.5), 
+    ### A vector of values to return the cdf probabilities for 
+covar, 
+    ### Vector of covariate values for each individual 
+    ### by which cdf summaries should be computed
+covar.order=NULL
+    ### Vector of the covariate values in their preferred order
+) {
+   
+    # Get the covariate values; use alphanumeric sort to 
+    # order them if an order is not specified
+    char.covar = as.character(covar)
+    if (is.null(covar.order)) covar.order = sort(unique(char.covar))
+
+    # If there is only one simulation run, turn the data into a 
+    # matrix
+    if (is.null(dim(data))) data = as.matrix(data)
+
+    # Function that summarizes one run by the covariate groups
+    summarize_one = function(thisrun, covs=char.covar, xvals=xvalues, 
+        x.is.tim=x.is.time, covar.values=covar.order) {
+        
+        # Get the empirical cdf    
+        cdfs = tapply(thisrun, INDEX=covs, FUN=ecdf)
+        
+        # Evaluate the empirical cdf at the intervals specified 
+        # by xvals, for each covariate group    
+        values = sapply(covar.values, FUN=function(x, c=cdfs, 
+            d=thisrun, cv=covs, xax=xvals, xit=x.is.tim) { 
+            this.data = d[cv==x]
+            S_t = 1 - cdfs[[x]](this.data)
+            S_ts <- approx(x=this.data, y=S_t, method="linear", 
+                xout=xax, yleft=1, yright=NA, f=1)[['y']]
+            S_ts = matrix(S_ts, nrow=1,dimnames=
+                list(names(cdfs)[x],NULL))
+            return(S_ts)
+            }, USE.NAMES=TRUE)
+        
+        # Reformat the results into one vector. Could have also 
+        # done this by turning values into a data frame and using 
+        # "stack"
+        values.long = c(values)
+        names(values.long) =  c(mapply(rep, colnames(values), 
+            nrow(values)))
+        return(values.long)    
+        
+    } # end summarize_one
+
+    # Apply summarize_one to each covariate group and compile results    
+    # Each column is a simulation, and rows are points on the empirical
+    # cdf. Rownames indicate which covariate group the empirical cdf
+    # refers to, so there are as many rows as there are groups times
+    # xvalues
+    summaries = sapply(1:ncol(data), 
+        FUN=function(x, c=covar, s=summ, d=data) { 
+            tmp = summarize_one(d[,x], covs=c)
+        }, USE.NAMES=TRUE )
+
+    # Now get the median and upper/lower bounds for each xvalue
+    # Using na.rm=TRUE because...well, how else to summarize?
+    # Also return the mean
+    summ2 = t(apply(summaries, 1, FUN=quantile, 
+        probs=c(0.025, 0.5, 0.975),na.rm=TRUE))
+    summ2 = cbind(apply(summaries,1,FUN=mean),summ2)
+    colnames(summ2)[1] = "Mean"
+
+    # Now calculate the medians
+    meds = sapply(covar.order, FUN=function(x) { 
+        d=as.matrix(data[covar==x,])
+        apply(d, 2, median)
+        })    
+    # Now calculate the means
+    means = sapply(covar.order, FUN=function(x) { 
+        d=as.matrix(data[covar==x,])
+        apply(d, 2, mean)
+        })    
+
+    # Format and return
+    summ2 = cbind(x=rep(xvalues,length.out=nrow(summ2)),summ2)
+    return(list(med=meds, mean=means, summ=summ2))
+
+### A list of 1) Median survivals for each simulation (rows) by covariate group (columns), 2) Same as #1 except means, and 3) Median, lower, and upper bound across simulations of survival probabilities at each timepoint specified in xvalues, by covariate group (indicated by rownames)
+}, ex=function(){
+    # Example code here! Just testing out the inlinedocs format 
+    # for examples
+})
+
+
+############################################################
+## summarize_censored
+############################################################
+
+# This function is similar but it summarizes multiple Kaplan-Meiers
+# Very slow right now--not sure if we can speed up the computation 
+# of thousands of KMs?
+
+summarize_censored = function# Summarize multiple Kaplan-Meiers by covariate groups
+
+##description<< Compute the net KM curve for a distribution with competing risk over multiple simulations, and return the distribution of medians and a summary of the K-M curves at each of the specified "xvalues"
+
+(cancer, 
+    ### Matrix of times to main endpoint. Rows are individuals
+other, 
+    ### Matrix of times to competing endpoint. Rows are individuals
+xvalues=seq(0,10,0.5), 
+    ### Vector of times to evaluate K-M survival probabilities 
+covar, 
+    ### Vector of covariate values for each individual 
+    ### by which K-Ms should be computed
+covar.order=NULL
+    ### Vector of the unique covariate values in their preferred order
+) {
+
+    # Covariate values
+    char.covar = as.character(covar)
+    if (is.null(covar.order)) covar.order = sort(unique(char.covar))
+    
+    # If there is only one simulation run, turn the data into a 
+    # matrix
+    if (is.null(dim(cancer))) {
+        cancer = as.matrix(cancer)
+        other = as.matrix(other)
+    }
+
+    # Prepare to save the median survival    
+    meds = matrix(NA,nrow=ncol(cancer),ncol=length(covar.order),
+        dimnames=list(NULL,covar.order))     
+        
+    # Function that summarizes one run by the covariate groups
+    summarize_one_censored = function(thiscanc, thisother, 
+        covs=char.covar, covar.values=covar.order, xvals=xvalues, n) {
+        
+        # Establish the times and censoring status
+        ctime = apply(cbind(thiscanc,thisother),1,min)
+        status = thiscanc<thisother    
+        cdata = data.frame(time=ctime, status=status)
+
+        # Evaluate the Kaplan Meier at the intervals specified by 
+        # xvals, for each covariate group
+        values = sapply(covar.values, 
+            FUN=function(x, c=cdata, cv=covs, xax=xvals) { 
+            this.data = c[cv==x,]
+
+            # Fit Kaplan-Meier curves to each of the covariate strata
+            km = survfit(Surv(time,status)~1, data=this.data)
+            kms = summary(km)
+
+            # If there is more than one failure... 
+            if (sum(this.data$status)>1) {
+
+                # Try to store median survival
+                approx(y=kms$time, x=kms$surv, method="linear", 
+                    xout=0.5, yright=NA)[['y']] ->> meds[n,x]
+                    # if (is.na(meds[n,x]) & x!="Lev+5FU") browser()
+            
+                # Now get the estimates for the xvalues points specified
+                # Using "rule=2" in the approx function so that when 
+                # times are greater than the time of the last event, the 
+                # survival will be that of the last event (consistent 
+                # with the step function of KM)
+                S_ts <- approx(x=kms$time, y=kms$surv, method="linear", 
+                    xout=xax, yleft=1, rule=1:2, f=1)[['y']]
+                S_ts = matrix(S_ts, nrow=1,dimnames=list(covar.values[x],
+                    NULL))
+            } else {
+                warning("\nIn summarize_censored, this sim has only one failure so we cannot compute a KM curve")
+                S_ts = matrix(NA, nrow=1,ncol=length(xax),
+                              dimnames=list(covar.values[x],NULL))
+            }
+
+            return(S_ts)
+            }, USE.NAMES=TRUE)
+                
+        # Reformat the results into one vector. Could have also done 
+        # this by turning values into 
+        # a data frame and using "stack"
+        values.long = c(values)
+        names(values.long) =  c(mapply(rep, colnames(values), 
+            nrow(values)))
+
+        return(values.long)    
+    } # end summarize_one_censored
+
+    # Apply summarize_one to each covariate group and compile results    
+    summaries = sapply(1:ncol(cancer), FUN=function(x, c=char.covar, 
+        canc=cancer, oth=other) { 
+        tmp = summarize_one_censored(thiscanc=canc[,x], 
+            thisother=oth[,x], covs=c, n=x)
+        }, USE.NAMES=TRUE )
+
+    # Now get the median and upper/lower bounds for each xvalue
+    summ2 = t(apply(summaries, 1, FUN=quantile, 
+                    na.rm=TRUE, probs=c(0.025, 0.5, 0.975)))
+    summ2 = cbind(apply(summaries,1,FUN=mean,na.rm=TRUE),summ2)
+    colnames(summ2)[1] = "Mean"
+
+    # Format and return
+    summ2 = cbind(x=rep(xvalues,length.out=nrow(summ2)),summ2)
+    return(list(med=meds,summ=summ2))
+
+### A list of 1) Net median survivals for each simulation (rows) by covariate group (columns) and 2) Median, lower, and upper bound across simulations of net survival probabilities at each timepoint specified in xvalues, by covariate group (indicated by rownames)
+} 
+
+
+
+############################################################
+# summarize_cmprsk
+############################################################
+
+# Cumulative incidence - incoporating OC death into number at risk
+
+summarize_cmprsk = function#Summarize multiple crude survival curves by covariate groups
+
+##description<< Compute the crude KM curve for a distribution with competing risk over multiple simulations, and return the distribution of medians and a summary of the crude survival at each of the specified "xvalues"
+
+(cancer, 
+    ### Matrix of times to main endpoint. Rows are individuals
+other, 
+    ### Matrix of times to competing endpoint. Rows are individuals
+xvalues=seq(0,10,0.5), 
+    ### Vector of times to evaluate K-M survival probabilities 
+covar=NULL,
+    ### Vector of covariate values for each individual 
+    ### by which crude survivals should be computed
+covar.order=NULL
+    ### Vector of the unique covariate values in their preferred order
+) {
+    warning("Default value for summarize_cmprsk used to be covar=pop1$rx")
+    # Get the covariate values; use alphanumeric sort to 
+    # order them if an order is not specified
+    char.covar = as.character(covar)
+    if (is.null(covar.order)) covar.order = sort(unique(char.covar))
+
+    # If there is only one simulation run, turn the data into a 
+    # matrix
+    if (is.null(dim(cancer))) {
+        cancer = as.matrix(cancer)
+        other = as.matrix(other)
+    }
+
+    # Prepare to save the median survival    
+    meds = matrix(NA,nrow=ncol(cancer),ncol=length(covar.order),
+        dimnames=list(NULL,covar.order))     
+    
+    # Function to evaluate one run
+    summarize_one_cmprsk = function(c, o, r=char.covar, n=NULL, 
+        xvals=xvalues) {
+        
+        # Establish the time to event and which event (1=cancer death, 
+        # 2=other-cause death.  0 would be censored.)
+        time = apply(cbind(c,o),1,min)
+        status = ifelse(c<o,1,2)
+        
+        # Estimate the cumulative incidence function
+        if (length(c)>100000) warning("cuminc in cmp_cdf function may not run with >100,000 records")
+        crude = cuminc(time,status,char.covar)
+        
+        # Evaluate it at the specified time points and just keep the 
+        # estimates where cancer is the endpoint (ends with a "1" - 
+        # remove that after it's not needed)
+        # Using approx because "timepoints" gives the step function, 
+        # not linear, approximation (they appear to be exactly the 
+        # same though)
+        # Also being careful with order so as to match the output
+        # of the other summarize functions
+        covar.values = names(crude)[grep("1$", names(crude))]
+        use.to.get.order = order(covar.order)
+        names(use.to.get.order) = 1:length(covar.values)
+        covar.values = sort(covar.values)[
+            as.numeric(names(sort(use.to.get.order)))]
+        
+        values = sapply(covar.values, USE.NAMES=TRUE, 
+            FUN=function(x, c=crude, xax=xvalues) {
+            vals = approx(x=c[[x]]$time, y=c[[x]]$est, xout=xax, 
+                yleft=1, rule=1:2, f=1, ties="ordered")[['y']]
+            # plot(timepoints(c,xax)$est[x,], vals) ; abline(a=0,b=1)
+            
+            # Also record the median
+            if (!is.null(n)) approx(x=c[[x]]$est, y=c[[x]]$time,
+                 method="linear", xout=0.5, yright=NA)[['y']] ->> 
+                 meds[n,gsub(" 1$", "", x)]
+            # Return
+            return(vals)    
+            })
+        colnames(values) = gsub(" 1$", "", colnames(values))    
+
+        # Now format it for return
+        survival = stack(as.data.frame(values))
+        survival$values = 1-survival$values    
+        survival = matrix(survival$values, ncol=1, dimnames=
+            list(survival$ind,"survival"))
+        return(survival)
+    }
+
+    # Get it for all runs
+    survs = sapply(1:ncol(cancer),FUN=function(x) { 
+        c=cancer[,x]
+        o=other[,x]
+        summarize_one_cmprsk(c,o, n=x)
+        })
+
+    # This is so dumb, but the one way I can think of now 
+    # to get the right row names
+    rownames(survs) = rownames(summarize_one_cmprsk(cancer[,1],other[,1]))
+
+    # Now get the median and upper/lower bounds for each xvalue
+    summ2 = apply(survs, 1, FUN=quantile, probs=c(0.025, 0.5, 0.975))
+    summ2 = rbind(apply(survs,1,FUN=mean),summ2)
+    rownames(summ2)[1] = "Mean"
+
+    # Format and return
+    summ2 = cbind(x=rep(xvalues,length.out=ncol(summ2)),t(summ2))
+    return(list(med=meds, summ=summ2))
+
+### A list of 1) Crude median survivals for each simulation (rows) by covariate group (columns) and 2) Median, lower, and upper bound across simulations of crude survival probabilities at each timepoint specified in xvalues, by covariate group (indicated by rownames)
+}
+
+############################################################            
+## calc_pys
+############################################################    
+
+# Person years saved
+calc_pys = function# Summarize person-years saved across simulations
+
+##description<< Calculate expected life-years for each person and 
+## compare total life years across intervention groups(s) to determine
+## the distribution life-years saved (or lost) by the intervention(s)
+## across interventions
+
+(cancer, 
+    ### Matrix of times to main endpoint. Rows are individuals
+other, 
+    ### Matrix of times to competing endpoint. Rows are individuals
+rx=pop1[,treatment_var], 
+    ### Vector indicating intervention/control groups
+obs=control_group,
+    ### Character string indicating which group is the control
+calc.time, 
+    ### At what time point after study start should the person-
+    ### years-saved be calculated?
+suppress_negative=TRUE,
+    ### Should negative person-years-saved be allowed (i.e. allow
+    ### person-years lost?)
+covar.order=NULL
+) {
+
+    # If only one simulation run, make matrices
+    if (is.null(dim(cancer))) {
+        cancer = as.matrix(cancer)
+        other = as.matrix(other)
+    }
+
+    # Calculate person-years-lived in each run 
+    pyl = sapply(1:ncol(cancer), FUN=function(x, c=cancer, o=other, 
+        index=rx, t=calc.time) {
+            # Sum the years lived by the index variable
+            death = apply(cbind(o[,x], c[,x]), 1, min)   
+            pyl = apply(cbind(death, rep(t,length(death))), 1, min) 
+            pyl.byrx = aggregate(pyl, by=list(rx), FUN=sum)
+            pyl.byrx.mat = cbind(pyl.byrx$x)
+            rownames(pyl.byrx.mat) = pyl.byrx$Group.1
+            if (x==1) rownames(pyl.byrx.mat) ->> mat.names
+            return(pyl.byrx.mat)
+        })    
+    pyl = t(pyl)
+    colnames(pyl) = mat.names
+
+    # Summarize them compared to the control group
+    treatments = which(colnames(pyl)!=obs)
+    pys = sapply(colnames(pyl)[treatments], 
+        FUN=function(x, p=pyl, o=obs) {
+        pys = pyl[,x]-pyl[,o]
+        # Limit to positive pys only, if option is specified
+        if (suppress_negative) pys = pys[pys>0]
+        if(length(pys)==0) pys = 0
+        return(c(PYS=mean(pys), quantile(pys, 
+            probs=c(0.025,0.975))))
+        })
+    rownames(pys) = c("Person-Time Saved", "Lower Bound", 
+        "Upper Bound")
+    if (!is.null(covar.order)) {
+        pys = pys[,covar.order[-which(covar.order==obs)]]
+    }
+    return(round(pys,3))
+
+### A matrix of mean, lower, and upper-bound person-years saved by treatment group (columns)
+}
+
+############################################################
+## summarize_sims
+############################################################
+
+# Function to summarize the mean and 95% intervals across sims
+summarize_sims = function# Summarize results across simulations
+
+##description<< Return the mean and 2.5% and 97.5% quantiles
+##across simulations
+
+(data,
+    ### Matrix of simulations. Rows are simulations and 
+    ### columns are groups for which distinct summaries
+    ### will be returned
+ ID,
+    ### ID for the data that will be used as a prefix
+    ### in the column names of the results
+ digits
+    ### number of digits to round the results
+) {
+
+    mean = apply(data, 2, FUN=mean, na.rm=TRUE)
+    ci = apply(data, 2, FUN=quantile, probs=c(.025,.975), na.rm=TRUE)
+    res = cbind(mean=t(t(mean)), t(ci))
+    colnames(res) = c("Mean", "Lower", "Upper")
+    colnames(res) = paste(colnames(res), ID)
+    return(round(res,digits))
+
+### A matrix of the mean, 2.5%-ile, and 97.5%-ile for each 
+### column of data
+}
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - COSTS
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+## calc_costs_QALYs_norecur
+############################################################
+
+calc_costs_QALYs_norecur = function# Calculate the cost of treatment in a population
+
+##description<< Takes in additional cost of treatment per year and computes
+## total cost of treatment based on life-years on treatment. Discounts if 
+## desired.
+
+(lifeyears,
+    ### Matrix of life-years lived after treatment. Rows are individuals
+    ### and columns are different simulations
+ treatment,
+    ### Matrix of treatment indicators, for each person in each sim
+ cancerdeath,
+    ### Matrix of indicators whether the death was from cancer (1) or other (0)
+ costutil,
+    ### Data frame where treatment indicators (as strings) are the first column, 
+    ### (relative) costs are the second column, and utilities are the third, 
+    ### with column names "Treatment", "Cost", "Utility". If life-years
+    ### are preferred to QALYs, use utilities of 1.0
+ costoftest=NULL,
+    ### If a test was administered to each individual, input its cost.
+    ### It will be multiplied by the number of individuals and added
+    ### to the total cost, undiscounted since it is assumed to be 
+    ### administered at time 0. 
+ discount=0,
+    ### Optional discount rate expressed as a PROPORTION not PERCENT,
+    ### e.g. input 3% discount rate as 0.03
+ timehorizon=NULL
+    ### If discounting, must specify the time frame of the lifeyears;
+    ### which should be stored in the variable time_max_inyears
+) {
+    if (discount==0) {
+        # Sum life-years by treatment group
+        lifeyrsum = aggregate_by_indicator(lifeyears,
+                                           treatment,
+                                           "sum")
+        colnames(lifeyrsum)[which(colnames(lifeyrsum)=="Group.1")] = "Treatment"
+        colnames(lifeyrsum)[which(colnames(lifeyrsum)=="x")] = "LifeYears"
+    } else {
+        # To discount, we have to separate out each year after
+        # the study starts since each year has a different discount
+        # rate
+
+        # Make a matrix of year indicators
+        yearindicator = t(replicate(nrow(lifeyears),1:timehorizon))
+
+        lifeyrsum = aggregate_by_indicator_and_year(lifeyears,
+                                                    "Sim",
+                                                    treatment,
+                                                    "Treatment",
+                                                    "sum",
+                                                    timehorizon)
+        # Calculate the discount rate (as a matrix of same dim's as lifeyrsum)
+        discount_rate = 1/(1+discount)^(yearindicator-1)
+        discount_rate = discount_rate[1:nrow(lifeyrsum),]
+
+        # Discounted life years
+        lifeyrdisc = lifeyrsum[,grep("V",colnames(lifeyrsum))]*discount_rate
+
+        lifeyrsum = data.frame(Treatment=lifeyrsum$Treatment,
+                                   Sim=lifeyrsum$Sim,
+                                   LifeYears=rowSums(lifeyrdisc))
+    }
+
+    # Add counts of treated and untreated to lifeyrsum
+    Ntreat = aggregate_by_indicator(matrix(1,ncol=ncol(treatment),
+                                           nrow=nrow(treatment)),
+                                    "Sim",
+                                    treatment,
+                                    "Treatment",
+                                    "sum")
+    lifeyrsum$N = Ntreat$x
+
+    # Calculate costs and QALYs by treatment per simulation
+    # Merge on costs and utilities
+    m = merge(lifeyrsum, costutil, by="Treatment", all.x=TRUE)
+    # Calculate total costs and QALYs by treatment, not yet including
+    # the one-time costs that are not by treatment
+    return = transform(m,
+                       TotCost = InitialCost*N+
+                                    AnnualCost*(LifeYears-N),
+                       QALY = InitialUtil*N + 
+                                    AnnualUtil*(LifeYears-N))
+                            
+    return = subset(return,
+                    select=c("Sim", "LifeYears", "TotCost", "QALY"))
+
+    # Sum over treatment to get total cost and QALY per sim
+    return = ddply(.data=return,
+                   .variables="Sim",
+                   .fun=colSums)
+    # The Sim indicator was summed, so fix that
+    # Use a mod=0 trick to NOT fix the Sim indicator if
+    # it's correct because there was only one treatment
+    # received by certain Sims
+    return = transform(return, Sim=ifelse(Sim%%nrow(costutil)==0,
+                                            Sim/nrow(costutil),
+                                            Sim))
+
+    # One-time future costs:
+    # End of life
+    # Cancer
+    endoflife = lifeyears*cancerdeath
+    costcd = calc_one_future_cost(endoflife,
+                                  timehorizon,
+                                  costutil$EndOfLifeCD[1],
+                                  "CDCost",
+                                  discount)
+    # Other causes
+    ocdeath = cancerdeath+1
+    ocdeath[ocdeath==2] = 0
+    endoflife = lifeyears*ocdeath
+    costoc = calc_one_future_cost(endoflife,
+                                  timehorizon,
+                                  costutil$EndOfLifeOC[1],
+                                  "OCCost",
+                                  discount)
+
+    # If there are annual costs, subtract off the 
+    # final year since we've included those as end-of-life costs
+    if (sum(costutil$AnnualCost!=0)) {
+        for (i in 1:nrow(costutil)) {
+            if (costutil$AnnualCost[i]!=0) {
+                treated = ifelse(treatment==costutil$Treatment[i],1,0)
+                minuscost= calc_one_future_cost(lifeyears*treated,
+                                          timehorizon,
+                                          costutil$AnnualCost[i],
+                                          "MinusCost",
+                                          discount)
+                costoc = costoc-minuscost
+            }
+        }
+    }
+
+    # Add these to total cost
+    OnetimeCost = apply(cbind(costcd,costoc),1,sum)
+    return$TotCost = return$TotCost + OnetimeCost
+
+    # Is there a cost of the test?
+    # No need to worry about discounting since it is a one-time cost
+    # administered in Year 1
+    if (!is.null(costoftest)) {
+        totcostoftest = costoftest*nrow(lifeyears)
+        return = transform(return,
+                           TotCost = TotCost+totcostoftest)
+    }
+    return(return)
+
+### A data frame of total costs and QALYs for each simulation
+}
+
+
+############################################################
+## calc_costs_QALYs
+############################################################
+
+calc_costs_QALYs = function# Calculate the cost of treatment in a population
+
+##description<< Takes in additional cost of treatment per year and computes
+## total cost of treatment based on life-years on treatment. Discounts if 
+## desired.
+
+(lifeyears,
+    ### Matrix of life-years lived after treatment. Rows are individuals
+    ### and columns are different simulations
+ timetorecur,
+    ### Matrix of times to disease recurrence (net). Rows are individuals 
+    ### and columns are different simulations
+ treatment,
+    ### Matrix of treatment indicators, for each person in each sim
+ cancerdeath,
+    ### Matrix of indicators whether the death was from cancer (1) or other (0)
+ costutil,
+    ### Data frame where treatment indicators (as strings) are the first column, 
+    ### (relative) costs are the second column, and utilities are the third, 
+    ### with column names "Treatment", "Cost", "Utility". If life-years
+    ### are preferred to QALYs, use utilities of 1.0
+ costoftest=NULL,
+    ### If a test was administered to each individual, input its cost.
+    ### It will be multiplied by the number of individuals and added
+    ### to the total cost, undiscounted since it is assumed to be 
+    ### administered at time 0
+ discount=0,
+    ### Optional discount rate expressed as a PROPORTION not PERCENT,
+    ### e.g. input 3% discount rate as 0.03. Use discount=0 for no
+    ### discounting
+ timehorizon=NULL
+    ### If discounting, must specify the time frame of the lifeyears;
+    ### which should be stored in the variable time_max_inyears
+) {
+    # Calculate time spent before recurrence
+    timeprerecur = ifelse(lifeyears>timetorecur,
+                          timetorecur,
+                          lifeyears)
+    if (discount==0) {
+
+        # Sum life-years by treatment group
+        lifeyrsum = aggregate_by_indicator(lifeyears,
+                                           "Sim",
+                                           treatment,
+                                           "Treatment",
+                                           "sum")
+        
+        # Sum pre-recurrence life-years by treatment group
+        # People who don't recur before OC death spend their whole life
+        # in pre-recurrence
+        prerecursum = aggregate_by_indicator(timeprerecur,
+                                             "Sim",
+                                           treatment,
+                                           "Treatment",
+                                           "sum")
+        # Add count of pre-recurrence to the lifeyrsum data frame
+        lifeyrsum = transform(lifeyrsum,
+                              PreRecur=prerecursum$x)
+        colnames(lifeyrsum)[which(colnames(lifeyrsum)=="x")] = "LifeYears"
+        lifeyrsum = transform(lifeyrsum, 
+                              PostRecur = LifeYears-PreRecur)
+    } else {
+        # To discount, we have to separate out each year after
+        # the study starts since each year has a different discount
+        # rate
+
+        lifeyrsum = aggregate_by_indicator_and_year(lifeyears,
+                                                    "Sim",
+                                                    treatment,
+                                                    "Treatment",
+                                                    "sum",
+                                                    timehorizon)
+    
+        prerecursum = aggregate_by_indicator_and_year(timeprerecur,
+                                                    "Sim",
+                                                    treatment,
+                                                    "Treatment",
+                                                    "sum",
+                                                    timehorizon)
+
+        # Make a matrix of year indicators
+        yearindicator = t(replicate(nrow(lifeyrsum),1:timehorizon))
+
+        # Calculate the discount rate 
+        # (as a matrix of same dim's as lifeyrsum)
+        discount_rate = 1/(1+discount)^(yearindicator-1)
+
+        # Discounted life years
+        lifeyrdisc = lifeyrsum[,grep("V",colnames(lifeyrsum))]*discount_rate
+        prerecurdis = prerecursum[,grep("V",colnames(prerecursum))]*discount_rate
+        lifeyrsum = data.frame(Treatment=lifeyrsum$Treatment,
+                                   Sim=lifeyrsum$Sim,
+                                   LifeYears=rowSums(lifeyrdisc),
+                                   PreRecur=rowSums(prerecurdis))
+        lifeyrsum = transform(lifeyrsum,
+                              PostRecur=LifeYears-PreRecur)
+    }
+
+    # Add counts of treated and untreated to lifeyrsum
+    Ntreat = aggregate_by_indicator(matrix(1,ncol=ncol(treatment),
+                                           nrow=nrow(treatment)),
+                                    "Sim",
+                                    treatment,
+                                    "Treatment",
+                                    "sum")
+    lifeyrsum$N = Ntreat$x
+
+    # Calculate costs and QALYs by treatment per simulation
+    # Merge on costs and utilities
+    m = merge(lifeyrsum, costutil, by="Treatment", all.x=TRUE)
+    # Calculate total costs and QALYs by treatment, not yet including
+    # the one-time costs that are not by treatment. This is slightly
+    # different depending on whether we are going through recurrence
+    # or not. 
+    if (sum(m$PreRecur!=0)==0) {
+        # We are not going through recurrence, because there
+        # are no pre-recurrence years recorded
+        return = transform(m,
+                           TotCost = InitialCost*N+
+                                        AnnualRecurCost*(PostRecur-N),
+                           QALY = InitialUtil*N +
+                                        AnnualRecurUtil*(PostRecur-N))
+    } else {
+        return = transform(m,
+                           TotCost = InitialCost*N+
+                                        AnnualCost*(PreRecur-N)+ 
+                                        AnnualRecurCost*PostRecur,
+                           QALY = InitialUtil*N +
+                                        AnnualUtil*(PreRecur-N)+
+                                        AnnualRecurUtil*PostRecur)
+    }
+    return = subset(return,
+                    select=c("Sim", "LifeYears", "TotCost", "QALY"))
+
+    # Sum over treatment to get total cost and QALY per sim
+    return = ddply(.data=return,
+                   .variables="Sim",
+                   .fun=colSums)
+    # The Sim indicator was summed, so fix that
+    return$Sim = rownames(return)
+
+    # One-time future costs:
+    # Recurrence
+    # Set timetorecur to greater than timehorizon if recurrence
+    # occurs after death (since timetorecur is NET)
+    # First, set to zero if we're not going through recurrence
+    if (sum(m$PreRecur!=0)==0) {
+        costrecur = data.frame(RecurCost=rep(0,nrow(return)))
+    } else {
+        timetorecur_if_alive = ifelse(timetorecur>lifeyears,
+                                      timehorizon+1,
+                                      timetorecur)
+        costrecur = calc_one_future_cost_indicator(timetorecur_if_alive,
+                                                   zero_is_zero_cost=FALSE,
+                                                   treatment, 
+                                                   timehorizon, 
+                                                   costutil[,c("Treatment",
+                                                               "InitialRecurCost")],
+                                                   "RecurCost", 
+                                                   discount)
+    } 
+    # End of life
+    # Cancer
+    endoflife = lifeyears*cancerdeath
+    costcd = calc_one_future_cost_indicator(endoflife,
+                                            zero_is_zero_cost=TRUE,
+                                            treatment,
+                                            timehorizon,
+                                            costutil[,c("Treatment",
+                                                       "EndOfLifeCD")],
+                                            "CDCost",
+                                            discount)
+    # Other causes
+    ocdeath = cancerdeath+1
+    ocdeath[ocdeath==2] = 0
+    endoflife = lifeyears*ocdeath
+    costoc = calc_one_future_cost_indicator(endoflife,
+                                            zero_is_zero_cost=TRUE,
+                                            treatment,
+                                            timehorizon,
+                                            costutil[,c("Treatment",
+                                                       "EndOfLifeOC")],
+                                            "OCCost",
+                                            discount)
+
+    # If there are annual recurrence costs, subtract off the 
+    # final year since we've included those as end-of-life costs
+    if (sum(costutil$AnnualRecurCost)!=0) {
+        # Only applies to those who have post-recurrence years
+        lifeyears_if_recur = ifelse(lifeyears>timetorecur,
+                                    lifeyears,
+                                    timehorizon+1)
+        minuscostrecur = calc_one_future_cost_indicator(
+                                                lifeyears_if_recur,
+                                                zero_is_zero_cost=FALSE,
+                                                treatment,
+                                                timehorizon,
+                                                costutil[,c("Treatment",
+                                                            "AnnualRecurCost")], 
+                                                "MinusRecurCost", 
+                                                discount)
+        costrecur = costrecur-minuscostrecur
+            # It's correct for this to be negative if we're
+            # not going through recurrence
+    }
+
+    # Add these to total cost
+    OnetimeCost = apply(cbind(costrecur,costcd,costoc),1,sum)
+    return$TotCost = return$TotCost + OnetimeCost
+
+    # Is there a cost of the test?
+    # No need to worry about discounting since it is a one-time cost
+    # administered in Year 1
+    if (!is.null(costoftest)) {
+        totcostoftest = costoftest*nrow(lifeyears)
+        return = transform(return,
+                           TotCost = TotCost+totcostoftest)
+    }
+    return(return)
+
+### A data frame of total costs and QALYs for each simulation
+}
+
+
+############################################################
+## calc_ICER
+############################################################
+
+calc_ICER = function#Calculate ICER across sims
+
+##description<< Takes in data frames from calc_costs_QALYs that
+## represent populations to be compared, calculates the ICERs
+## for each sim, and returns summary statistics on the ICER as 
+## well as on costs and QALYs for each population
+
+(dfNew,
+    ### A data frame returned by calc_costs_QALYs of
+    ### TotCost, QALY, and Sim, for the population
+    ### with the new intervention. If there are multiple interventions,
+    ### this can be a list of data frames
+ dfCompare,
+    ### The corresponding data frame for the comparison group
+ thresholds=NULL,
+    ### If data for a cost-effectiveness acceptability curve
+    ### is desired, a vector of thresholds to evaluate
+ perperson=NULL
+    ### To scale the costs and QALYs to be per person, 
+    ### specify the number of people in the pop rather than NULL
+ ) {
+    
+    if (!(is.data.frame(dfNew) | is.matrix(dfNew))) stop("Not coded yet for multiple new interventions")
+
+    # Calculate ICERs
+    icer = data.frame(CostDiff = dfNew$TotCost-dfCompare$TotCost,
+                      LYDiff = dfNew$LifeYears - dfCompare$LifeYears,
+                      QALYDiff = dfNew$QALY - dfCompare$QALY)
+    
+    if (!is.null(perperson)) icer = icer/perperson
+
+    icer = transform(icer,
+                     ICER_LY = CostDiff/LYDiff,
+                     ICER_QALY = CostDiff/QALYDiff, 
+                     Quadrant_LY = ifelse(CostDiff>0 & LYDiff>0,1, 
+                                          ifelse(CostDiff>0 & LYDiff<0,2, 
+                                              ifelse(CostDiff<0 & LYDiff<0,3,4))),
+                     Quadrant_QALY = ifelse(CostDiff>0 & QALYDiff>0,1, 
+                                          ifelse(CostDiff>0 & QALYDiff<0,2, 
+                                              ifelse(CostDiff<0 & QALYDiff<0,3,4))))
+
+    summary = apply(icer,2, function(x) {
+                return(c(Mean=mean(x), quantile(x, probs=c(0.025,0.5,0.975))))
+                })
+
+    if (!is.null(thresholds)) {
+        threshmatrix = t(replicate(nrow(dfNew),thresholds))
+        icer_LY = replicate(length(thresholds),icer$ICER_LY)
+        icer_QALY = replicate(length(thresholds),icer$ICER_QALY)
+        # Now adjust: if in quadrant 2, it's always above the 
+        # threshold. If in quadrant 4, always below, which will
+        # naturally work out since it's negative 
+        quad_LY = replicate(length(thresholds), icer$Quadrant_LY)
+        quad_QALY = replicate(length(thresholds), icer$Quadrant_QALY)
+        icer_LY[quad_LY==2] = max(threshmatrix)+10000
+        icer_QALY[quad_QALY==2] = max(threshmatrix)+10000
+        # Now calculate acceptability
+        accep_LY = colMeans(icer_LY<threshmatrix)
+        accep_QALY = colMeans(icer_QALY<threshmatrix)
+        accep = data.frame(Thresholds=thresholds,
+                           LY=accep_LY,
+                           QALY=accep_QALY)
+    } else accep=NULL
+
+    return(list(ICERData=icer,
+                Summary=summary,
+                Acceptability=accep))
+                
+
+### A list of 1) The cost, LY, and QALY differences and ICERs, 
+### 2) a data frame of summary statistics for those measures, and 
+### 3) if thresholds is not NULL, cost-effectiveness acceptability
+}
+
+
+############################################################
+## calc_one_future_cost
+############################################################
+
+calc_one_future_cost = function#Apply discounting to calculate a one-time future cost
+
+##description<< Calculate the discounted value of a one-time future cost by 
+## specifying its present value, the time in the future it will occur, and the
+## discount rate. 
+
+(times,
+    ### Matrix of times at which the event occurs
+ timehorizon,
+    ### Specify time past which cost does not matter
+ cost,
+    ### Cost of event
+ cost_name = "Cost",
+    ### Describe what cost is being calculated
+ discount
+    ### Discount rate specified as a proportion, e.g. 3% is 0.03
+ ) {
+    
+    # Apply the time horizon cutoff
+    times_that_matter = ifelse(times<timehorizon,
+                               times,
+                               0)
+
+    # Calculate the discount rate, but if there is no event because of 
+    # the time horizon, make that cell entry = 0 not 1.
+    discount_matrix = 1/(1+discount)^times_that_matter
+    discount_matrix[times_that_matter==0] = 0
+
+    # Calculate discounted cost
+    cost_matrix = cost*discount_matrix
+    cost_matrix = data.frame(colSums(cost_matrix))
+    colnames(cost_matrix) = cost_name
+    rownames(cost_matrix) = NULL
+
+    return(cost_matrix)
+
+### Data frame of discounted costs; each row is the column sum of 
+### discounted costs in the original matrix
+}
+
+
+############################################################
+## calc_one_future_cost_indicator
+############################################################
+
+calc_one_future_cost_indicator = function#Apply discounting to calculate a one-time future cost
+
+##description<< Calculate the discounted value of a one-time future cost by 
+## specifying its present value, the time in the future it will occur, and the
+## discount rate. Cost can differ by indicator
+
+(times,
+    ### Matrix of times at which the event occurs
+ zero_is_zero_cost = FALSE,
+    ### Are zeros in the times matrices meant to mean discount = 0? If so,
+    ### set to false. If zeros are meant to mean zero cost, set to TRUE
+ indicator,
+    ### Matrix of indicator values
+ timehorizon,
+    ### Specify time past which cost does not matter
+ costs,
+    ### Data frame with columns of 1)indicator 2)costs 
+ cost_name = "Cost",
+    ### Describe what cost is being calculated
+ discount
+    ### Discount rate specified as a proportion, e.g. 3% is 0.03
+ ) {
+
+    # Apply the time horizon cutoff
+    times_that_matter = ifelse(times<timehorizon,
+                               times,
+                               -1)
+
+    # Calculate the discount rate, but if there is no event because of 
+    # the time horizon, make that cell entry = 0, since we want to 
+    # assign zero costs to that cell
+    discount_matrix = 1/(1+discount)^times_that_matter
+    discount_matrix[times_that_matter==-1] = 0
+    # Also turn entries to zero that are meant to have no cost
+    if (zero_is_zero_cost) discount_matrix[times_that_matter==0] = 0
+
+    # Make matrix of costs according to indicator
+    cost_matrix = indicator
+    if (mode(cost_matrix)=="character") {
+        warning("Coercing treatment indicator to numeric")
+        cost_matrix = apply(cost_matrix,2,as.numeric)
+    }
+    for (i in costs[,1]) {
+        cost_matrix[indicator==i] = costs[which(costs[,1]==i),2]
+    }
+    # Calculate discounted cost
+    cost_matrix = cost_matrix*discount_matrix
+    cost_matrix = data.frame(colSums(cost_matrix))
+    colnames(cost_matrix) = cost_name
+    rownames(cost_matrix) = NULL
+
+    return(cost_matrix)
+
+### Data frame of discounted costs; each row is the column sum of 
+### discounted costs in the original matrix
+}
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - PLOTS
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################         
+## ggplot_summary
+############################################################    
+
+ggplot_summary = function# Plots survival results
+
+##description<< Takes in a list of survival summaries to plot 
+##using ggplot2 and graphs them as survival curves
+
+##note<< I need to refresh my memory on the format of the 
+##survival summary
+
+(summ, 
+    ### A named list of survival summaries
+ estimate_column,
+    ### Name of the column containing the point estimate
+covar.order=NULL,
+    ### The order in which the survival summaries should appear, 
+    ### specified as a vector of names corresponding to the names of
+    ### summ
+ys=c(0,1),
+    ### Limits for the y-axis
+graph.title=""
+    ### Title of graph
+) {
+
+    # Function that turns data into tidy df's
+    # Assumes that rownames indicate groups to be plotted
+    # in different colors
+    make.df = function(mat) {
+        df = as.data.frame(mat)
+        df$group = rownames(mat)
+        df = df[c("x","2.5%",estimate_column,"97.5%","group")]
+        colnames(df) = c("Time", "Lower", "Estimate", "Upper", "Group")
+        return(df)
+    }
+    if (is.list(summ)) {
+        dflist = lapply(names(summ), FUN=function(x) {
+            this.df = make.df(summ[[x]])
+            this.df$Survival = rep(x,nrow(this.df))
+            return(this.df)
+            })
+        summ.df = rbind.fill(dflist)
+    } else {
+        stop("Function expects a list of survivals to plot")
+    }
+    if (!is.null(covar.order)) {
+        summ.df$Group = factor(summ.df$Group, levels=covar.order)
+    }
+  
+    g = qplot(Time, Estimate, data=summ.df, color=Group, geom="line",
+        main=graph.title, facets = .~Survival) 
+    #g = g + geom_line(aes(data=summ.df, x=Time, y=Lower, linetype=2)) 
+    g = g + geom_ribbon(aes(x=Time, ymin=Lower, ymax=Upper, fill=Group), alpha=0.3) 
+    g = g + scale_y_continuous('Survival', limits=ys, expand=c(0, 0))
+    #g = g + scale_x_continuous('Years on Study', expand=c(0, 0))
+    return(g)
+
+### A ggplot2 object
+}
+
+
+############################################################
+## ggplot_ICER
+############################################################
+
+ggplot_ICER = function# Plot ICERs on a 4-quadrant cost-effectiveness plane
+
+##description<< Takes the results of calc_ICER and plots the ICERs on
+##a 4-quadrant cost-effectiveness plane, emphasizing the quadrants
+##where the data lie
+
+(icerdata,
+    ### Data frame with columns "CostDiff" and either "LYDiff" or "QALYDiff"
+ xaxis = "QALY",
+    ### Choose either "QALY" or "LY" for the x-axis. Corresponding variable
+    ### must be in the icerdata data frame
+ thresholds = c(0, 50000, 100000)
+    ### Thresholds to indicate in Quad 1 on the cost-effectiveness plane
+ ) {
+
+    # Establish axes
+    if (xaxis=="QALY") {
+        x = icerdata$QALYDiff 
+        xlab = "QALY Difference"
+        icer = icerdata$ICER_QALY
+        quad = icerdata$Quadrant_QALY
+    } else {
+        x = icerdata$LYDiff
+        xlab = "Life-Year Difference"
+        icer = icerdata$ICER_LY
+        quad = icerdata$Quadrant_LY
+    }
+    y = icerdata$CostDiff
+
+    # Determine x- and y-axis limits
+    get_axis_limits = function(data) {
+        min=min(data)
+        max=max(data)
+        # If the range doesn't span zero, change min or max
+        if (!(min<0 & max>0)) {
+            if (min<0 & max<0) max = (abs(min)/10)
+            else if (min>0 & max>0) min = -(max/10)
+        }
+        return(c(min,max))
+    }
+
+    xlim = get_axis_limits(x)
+    ylim = get_axis_limits(y)
+
+    # Determine ICER thresholds to plot as different symbols
+    thresholds = c(thresholds, max(icer))
+    icer_range = cut(icer,breaks=thresholds,dig.lab=7,ordered_result=TRUE)
+    icer_range = factor(icer_range, levels=c("Dominant",
+                                             levels(icer_range),
+                                             "Dominated"))
+    icer_range[quad==2] = "Dominated"
+    icer_range[quad==4] = "Dominant"
+
+    q = qplot(x,y,geom="point",shape=icer_range) + 
+        scale_x_continuous(limits=xlim,
+                           name=xlab) +
+        scale_y_continuous(limits=ylim,
+                           name="Cost Difference") + 
+        geom_hline(yintercept=0) + 
+        geom_vline(xintercept=0) + 
+        scale_shape(name="ICER Category")
+    return(q)
+        
+### A ggplot of the cost-effectiveness plane
+}
+
+############################################################
+## ggplot_acceptability
+############################################################
+
+ggplot_acceptability = function# Plots a cost-effectiveness acceptability curve
+
+##description<< Takes the results of calc_ICER and plots a cost-effectiveness acceptability curve for both LY and QALYs overlayed, if desired
+
+(data
+    ### Data frame with columns for Thresholds, LY, and QALY
+ ) {
+
+    # Melt data
+    colnames(data)[which(colnames(data)=="LY")] = "Life-Years"
+    colnames(data)[which(colnames(data)=="QALY")] = "QALYs"
+    d = melt(data,id="Thresholds")
+    colnames(d)[which(colnames(d)=="variable")] = "Benefit Measure"
+
+    # Plot
+    q = qplot(Thresholds, value, group=`Benefit Measure`, 
+              linetype=`Benefit Measure`, data=d, geom="line") + 
+        scale_x_continuous(name="Cost-Effectiveness Threshold") + 
+        scale_y_continuous(name="Probability cost-effective",
+                           limits=c(0,1))
+    return(q)
+### A ggplot of cost-effectiveness acceptability
+}
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# COMMON FUNCTIONS - MISCELLANEOUS
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+## track_version
+############################################################
+
+track_version = function# Creates or appends to a "version info" file
+
+##description<< Takes in a small data frame containing version 
+##information and either writes it as a new file or appends to 
+##existing file. 
+
+(version_info, 
+    ###A data frame that must have a column called "version" in which
+    ### a unique identifier is stored (can be alphanumeric)
+    ### Example: vinfo = data.frame(version="edrn_1", 
+    ### description="Linear hazard, varying rules")
+filename
+    ### Name of .csv file to write or append to
+) {
+    if (file.exists(filename)) {
+        # Read in the file
+        tmp = read.csv(filename,header=TRUE)
+        if (!v%in%tmp$version) {
+            write.table(version_info, 
+                      filename, 
+                      sep=",",
+                      append=TRUE, 
+                      row.names=FALSE,
+                      col.names=FALSE)
+        }
+    } else write.table(version_info, filename, sep=",", row.names=FALSE)
+### No return value
+}
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# AREA (A) - PREVENTION
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# AREA (B) - BIOMARKERS
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+# Functions need to be imported to this file
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# AREA (C) - SCREENING
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# AREA (D) - DIAGNOSTICS
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+############################################################
+## rx_bootstrap
+## rx_logit
+############################################################
+
+# Updated 4/23/12
+
+# Methods to assign treatment assignment in the population
+
+# Not quite like ttr_bootstrap but maybe that needs to be 
+# updated too.
+
+# Instead of bootstrapping from survival curves, bootstrap
+# treatment assignment directly by generating nsim datasets.
+
+rx_bootstrap = function# Bootstraps treatment from a dataset of treatment assignments
+
+##description<< Takes a dataset on treatment assignment and
+##bootstraps from it by covariate combinations to assign treatment
+##in a population
+
+##note<< This function really needs revamping. It's ridiculously 
+##specific to the exact usage, and that itself seems illogical!
+
+(data_bootrows, 
+    ### A data frame that has columns sim1...simX indicating
+    ### rows for X bootstrapped datasets
+rx_var="rx", 
+    ### Variable that will be returned from the bootstrapped
+    ### datasets
+n_sim, 
+    ### Number of bootstrapped datasets/simulations
+prefix="sim"
+    ### Prefix for the names of each bootstrapped dataset
+) {
+
+    # Get a matrix of just the rows
+    rows = data_bootrows[,grep(prefix, colnames(data_bootrows))]
+
+    # Now get a matrix of the sampled rx_var for each sim
+    rxboot = sapply(1:nsim, function(x) {
+                    data_bootrows[,rx_var][rows[,x]]
+    })
+    colnames(rxboot) = paste(prefix, 1:nsim, sep="")
+    
+    return(data.frame(rxboot))
+
+### Data frame of nsim treatment assignments, where the variable "sim" is the intermediate outcome, in the form of "testresult-binarytreatmentindicator"
+}
+
+
+rx_logit = function# Estimates the probability of receiving treatment conditional on specified covariates and simulates treatment assignment
+
+##description<< Runs a logistic regression of treatment assignent on each bootstrapped dataset, predicts probability of treatment assignment in the population, and then simulates a treatment assignment for each person based on how the predicted probability compares to a draw from the uniform distribution
+
+(data_bootrows, 
+    ### Data frame of treatment assignments and covariates, 
+    ### along with bootstrapped row numbers for nsim datasets
+rxvar, 
+    ### Treatment assignment variable
+covars, 
+    ### Vector of covariate names
+isfactor,
+    ### A vector of TRUE/FALSE values that indicate whether each 
+    ### covariate should be considered a factor variable
+pop=NULL, 
+    ### Population for which to predict; must have same covariates
+    ### If NULL, will use input data
+n_sim, 
+    ### Number of simulated treatment assignments to return
+prefix="sim"
+    ### Prefix to identify columns of simulations return
+) {
+
+    if (!is.null(isfactor)) {
+        # Convert variables to "as.factor(variable)"
+        covars[isfactor] = paste("as.factor(", 
+                                 covars[isfactor],
+                                 ")", sep="")
+    }
+
+    # Specify the formula for fitting time 
+    logit_formula = paste(rxvar, "~", paste(covars, 
+        collapse="+"))
+    print("Model:")
+    print(logit_formula)
+
+    # Fit the model and simulate from the predicted 
+    # probability FOR EACH BOOTSTRAPPED DATASET
+    rxs = sapply(1:n_sim, function(x, 
+                                   d=data_bootrows,
+                                   p=pop) {
+
+        # Identify which dataset
+        thisboot = paste(prefix, x, sep="")
+        thisdat = d[d[,thisboot],]
+
+        # Run model
+        rx_model = glm(as.formula(logit_formula), family=binomial, 
+                       data=thisdat)
+
+        # Translate the results into n_sim appropriate draws
+        # for each person           
+
+        # Compute the linear predictor for each person
+        if (is.null(p)) newdat=thisdat else {
+            cat("I don't think this is coded\n")
+            newdat=p[d[,thisboot],]
+        }
+        prob = predict(rx_model, newdata=newdat, type='response', 
+            se.fit=FALSE)
+
+        # Simulate a treatment assignment based on the predicted
+        # prob
+        # Use random draws from the uniform distribution and evaluate
+        # using the predicted probability as the cutoff
+        draws = runif(length(prob))
+        rxs = ifelse(draws<prob, 1, 0)
+
+        # Now paste on the test score - phasing this custom step out
+        # rxs = paste(thisdat$test,rxs,sep="-")
+        return(rxs)
+    })
+
+    # Label columns
+    colnames(rxs) = paste(prefix, 1:n_sim, sep="")
+
+    # Return
+    return(data.frame(rxs))
+
+### Data frame of nsim treatment assignments, where the variable "sim" is the intermediate outcome, in the form of "testresult-binarytreatmentindicator"
+} 
+
+
+############################################################
+## choose_rx
+############################################################
+
+choose_rx <- function# Select the method to estimate treatment assignment
+
+##description<< Treatment assignment can either be bootstrapped from
+##the data or simulated from a logistic regression of the data
+
+(choices, 
+    ### A list of 
+    ###     "covars", a vector of covariates;
+    ###     "covars_factor", a vector of TRUE/FALSE indicators of whether
+    ###         each covariate is a factor variable;
+    ###     "sims", the number of simulations
+type, 
+    ### Method of treatment assignment, either "bootstrap" or "logit"
+thisuserdat, 
+    ### Data from which to bootstrap/simulate the treatment
+thistest=NULL
+    ### "test" variable name for bootstrap option that contains the 
+    ### indicator of whether the diagnostic test was administered
+) {
+    usercovars = choices[["covars"]]
+    factorstatus = choices[["factor"]]
+    usersims = choices[["sims"]]
+    thisrxvar = paste("rx_t", thistest, sep="")
+    
+    switch(type,
+        bootstrap = rx_bootstrap(data=thisuserdat, 
+                                 n_sim=usersims),
+        logit = rx_logit(data=thisuserdat, 
+                         covars=usercovars, 
+                         isfactor = factorstatus, 
+                         n_sim=usersims, 
+                         rxvar=thisrxvar)
+    )
+
+##seealso<< \code{\link{rx_bootstrap}} and \code{\link{rx_logit}}
+
+### No return value of its own; returns whatever is returned by 
+### the function it calls
+}
+
+
+############################################################
+## extract_treatment
+############################################################
+
+extract_treatment = function# Return treatment assignment from composite variable
+
+##description<< Given a string variable of form "testresult-treatmentindicator",
+## extract and return the treatment indicator
+
+(matrix,
+    ### Matrix of the string composite indicators
+as.numeric=FALSE
+    ### If the treatment indicator is numeric, return a numeric matrix?
+) {
+    # Extract the treatment info by using gsub to find the hyphen 
+    # and return the text/numbers after it
+    rx = apply(matrix, 2, gsub,
+               pattern = "([[:alnum:]]*)(-)([[:alnum:]]*)", 
+               replacement = "\\3")
+
+    if (as.numeric) rx = apply(rx,2,as.numeric)
+    return(rx)
+
+### A matrix of treatment indicators
+}
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# AREA (E) - TREATMENT
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+# THESE FUNCTIONS NEED TO BE COMMENTED AND CLEANED
+
+############################################################
+## fit_parametric
+############################################################
+    
+# Fits the standard parametric models to the data based on covariate
+# and return the plots of the fit. If no covariates desired, just leave 
+# covariates=1. If you just want to plot the data and leave out 
+# the parametric fit, use fp_dist=NULL
+    
+fit_parametric = function# Plot parametric fit or KM curve of time to recurrence data
+
+##description<< Fits the standard parametric models to the data based 
+## on covariate and return the plots of the fit. If no covariates desired, 
+## just leave covariates=1. If you just want to plot the data and leave 
+## out the parametric fit, use fp_dist=NULL
+
+(fp_data, 
+    ### Time to recurrence data with covariates "time" and "status"
+fp_dist, 
+    ### Parametric distribution to overlay. One of "weibull", 
+    ### "exponential", "gaussian", "logistic","lognormal", "loglogistic" OR
+    ### NULL -- if NULL, will plot the KM curve 
+fp_covar=1,
+    ### Covariates in the model. Set to 1 if no covariates desired.
+    ### ***I'm not sure I tested it with real covariates; it may not work
+time_max=NULL, 
+    ### Maximum time to plot. If NULL, defaults to max(fp_data$time)
+prob_surv_min=0, 
+    ### What should be the minimum survival probability for the plot?
+covar.order=NULL
+    ### If covariates are specified, should there be an order they
+    ### are displayed in the legend?
+) {
+    
+    # Specify the formula for fitting time 
+    fp_formula = paste("Surv(time, status) ~", paste(fp_covar, 
+        collapse="+"))
+    
+    # Fit the model
+    if (!is.null(fp_dist)) {
+        fp_model = survreg(as.formula(fp_formula), dist=fp_dist, 
+            data=fp_data)
+        print("Model:")
+        print(fp_formula)
+    }
+    
+    # Now return the plot of the data stratified by treatment, and 
+    # plot a model fit to the full data
+    
+    # Plot out to the time_max (if null, max time in the data)
+    if (is.null(time_max)) time_max = max(fp_data$time)
+        
+    if (!is.null(fp_dist)) {
+        # If indicated, fit a model to the full data, no covariates
+        fp_full_model = survreg(Surv(time,status)~1, dist=fp_dist
+            , data=fp_data)
+        
+        # Get fitted values for a pretty complete curve
+        # I checked this for the Weibull against pweibull, and it 
+        #       produced the right curve
+        #       The "newdata" command confuses me, not sure why 
+        #       specifying a constant is necessary
+        #       when there are no covariates, but at least it works
+        fp_full_model_fitted <- predict(fp_full_model, 
+            newdata=data.frame(1), type='quantile', 
+            p=seq(0,1-prob_surv_min,0.01), se=TRUE)
+        
+        # Truncate the values at time_max, for the plot
+        fitted_subset = fp_full_model_fitted$fit[
+            fp_full_model_fitted$fit >=0 
+            & fp_full_model_fitted$fit <= time_max]
+        prob_subset = seq(0,1-prob_surv_min,0.01)[
+            fp_full_model_fitted$fit >=0 
+            & fp_full_model_fitted$fit <= time_max]
+        
+        # Plot the parametric curve
+        plot(fitted_subset, 1-prob_subset, type="l", 
+            xlab="Time", ylab="Probability of not recurring",
+            main=fp_dist, ylim=c(0,1))
+        
+        # Add the KM curve    
+        lines(survfit(Surv(time,status)~1, data=fp_data), 
+            col="black")    
+    } else {            
+        # Or, if no model fitted, just plot a KM of the full data
+        plot(survfit(Surv(time,status)~1, data=fp_data), col="black", 
+                xlim=c(0,time_max))
+    }
+    
+    # Add the KM curve for each treatment group
+    if (is.null(covar.order)) {
+        covar.order =  as.character(unique(fp_data$rx))
+    }                
+    for (i in 1:length(covar.order)) {
+        r = covar.order[i]
+        fp_data_subset = fp_data[as.character(fp_data$rx)==r,]
+        lines(survfit(Surv(time,status)~1, data=fp_data_subset), 
+            col=i+1)
+    }
+    
+    # Add a legend    
+    legend("bottomleft", fill=1:(length(covar.order)+1), 
+        legend=c("Full data", covar.order), bty="n", ncol=2)
+
+### A base package plot
+}
+
+# fit_parametric example
+
+if (1==0) {                
+    # Plot the fits of several distributions
+        these_dist = c("weibull", "exponential", "gaussian", "logistic",
+            "lognormal", "loglogistic")
+        pdf(file="parametric fits.pdf", width=8,height=11)
+            layout(matrix(1:length(these_dist),ncol=2),widths=c(1,1))
+            sapply(these_dist, FUN=fit_parametric, fp_data=colon.recur, 
+                plot=TRUE)
+        dev.off()
+}
+
+
+############################################################
+## ttr_bootstrap
+## ttr_param
+## ttr_cox
+############################################################
+    
+# Generate times to recurrence by bootstrapping from the data
+# Not sure how complex we need the matching algorithm between
+# the data and the population to be.  Should we require
+# the covariates to be coarse enough to have at least N observations
+# in the data for each stratum in the population, or should
+# we do something more complex?  Right now it only works for a 
+# simple case where there is plenty of data for few covariates.
+
+ttr_bootstrap = function(data, pop, covars, n_sim=1000, ttr_var="time", 
+    inf=1000000, zero=0) {
+
+    # Generate an empty ttr matrix for the population
+    ttr_mat = matrix(NA,nrow=nrow(pop),ncol=n_sim,
+        dimnames=list(rownames(pop),paste("ttr",1:n_sim,sep="")))
+
+    pop_combos = name_strata(data=pop[,covars])
+    data_combos = name_strata(data=data[,covars])
+
+    # Store those combos that appear in the pop but not the data 
+    # and print a message about them
+    not_observed = unique(pop_combos[!pop_combos%in%data_combos])
+    if (length(not_observed)!=0) cat(length(not_observed), 
+        "covariate combinations in population are unobserved in data", 
+        "\n")
+
+    # Fit Kaplan-Meier curves to each of the covariate strata
+    surv_formula = paste("Surv(time, status) ~", paste(covars, 
+        collapse="+"))
+    km = survfit(as.formula(surv_formula), data=data)
+    kms = summary(km)
+
+    # This function draws ttrs based on the stratum-specific KMs
+    get_ttr = function(stratum, k=kms, n=n_sim) {
+        # Get the probabilities and times to recurrence for this stratum
+        # Add the point (time=0, surv=1) to make it complete
+        time = c(0,k$time[k$strata==stratum])
+        survival = c(1,k$surv[k$strata==stratum])
+        
+        # Take n_sim random draws between 0 and 1
+        draws = runif(n)
+        
+        # Now get the corresponding times to recurrence
+        # ttrs <- approx(x=survival, y=time, method="constant", 
+        #    xout=draws, yleft=inf, yright=zero, f=1)[['y']]
+        ttrs <- approx(x=survival, y=time, method="linear", 
+            xout=draws, yleft=inf, yright=zero, f=1)[['y']]
+        # if (sum(is.na(ttrs))!=0) browser()
+        # sort to plot: temp = data.frame(t=ttrs,s=draws) ; 
+        # test = temp[sort.list(temp$t),]
+        return(ttrs)
+    }
+
+    # Now apply it to each stratum and store the results for the 
+    # appropriate people
+    for (s in unique(pop_combos)[
+        unique(pop_combos)%in%unique(data_combos)]) {
+        strata_ttr = get_ttr(s, n=n_sim*sum(pop_combos==s))
+        ttr_mat[pop_combos==s,]<-matrix(strata_ttr,ncol=ncol(ttr_mat))
+    }    
+    
+    # Append to the pop data and return
+    pop_ttr = data.frame(cbind(pop,ttr_mat))
+    return(pop_ttr)
+}
+
+    
+# Generate times to recurrence for each member of the population
+# using a standard parametric distribution of ttr
+
+ttr_param = function(data, distr, covars, pop, n_sim) {
+    # Specify the formula for fitting time 
+    ttr_formula = paste("Surv(time, status) ~", paste(covars, 
+        collapse="+"))
+
+    # Fit the model
+    ttr_model = survreg(as.formula(ttr_formula), dist=distr, data=data)
+    print("Model:")
+    print(ttr_formula)
+
+    # Attempting to translate the results into n_sim appropriate draws
+    # for each person, starting with the Weibull distribution
+    if (distr=="weibull") {
+        # Compute the linear predictor for each person
+        lp = predict(ttr_model, newdata=data.frame(pop), type='linear', 
+            se=FALSE)
+
+        # Function to generate n_sim deviates for each person.  
+        # This whole part should certainly be optimized later
+        get_deviates = function(linear, model_scale=ttr_model$scale, 
+            n=n_sim) {
+            return(rweibull(n, scale=exp(linear), shape=1/model_scale))
+        }
+
+        # Generate the deviates and store in a (npop)x(n_sim) matrix
+        ttr = t(sapply(lp, FUN=get_deviates))
+        colnames(ttr) = paste("ttr", 1:n_sim, sep="")
+
+        # Append to the pop data and return
+        pop_ttr = data.frame(cbind(pop,ttr))
+        return(pop_ttr)
+    } else {
+        return(warning("Only coded for the Weibull distribution so far"))
+    }
+} # end ttr_param
+
+
+# Generate times to recurrence for each member of the population
+#    using a Cox model
+
+ttr_cox = function(data, covars, pop, n_sim=1000, inf=1000000, zero=0) {
+    # Specify the formula for fitting time 
+    ttr_formula = paste("Surv(time, status) ~", paste(covars, 
+        collapse="+"))
+
+    # Fit the model
+    ttr_model = coxph(as.formula(ttr_formula), data=data)
+    print("Model:")
+    print(ttr_formula)
+
+    # Attempting to translate the results into n_sim appropriate draws
+    # for each person
+    
+    # Compute the survival curve for each person
+    # This is slow--a faster way would be to compute only the unique 
+    # curves for each combination of covariates,
+    # and then match them to the population according to covariates.
+    # Should I use Kaplan-Meier or the Nelson-Aaelen curve?
+    # Note that scurve$surv has each person as a column and their
+    # prediction for each event time as a row
+    scurve = survfit(ttr_model, newdata=data.frame(pop),
+        type="kaplan-meier", conf.type="none")
+
+    # Function to generate n_sim deviates for each person.  
+    # This whole part should certainly be optimized later
+    get_cox_deviates = function(survival, time=scurve$time, n=n_sim) {
+        # Take n_sim random draws between 0 and 1
+        draws = runif(n)
+    
+        # Now get the corresponding times to recurrence
+        # ttrs <- approx(x=survival, y=time, method="constant", 
+        # xout=draws, yleft=inf, yright=zero, f=1)[['y']]
+        ttrs <- approx(x=survival, y=time, method="linear", 
+            xout=draws, yleft=inf, yright=zero, f=1)[['y']]
+            
+        # Return
+        return(ttrs)
+    }
+
+    # Generate the deviates and store in a (npop)x(n_sim) matrix
+    ttr = t(apply(scurve$surv, 2, FUN=get_cox_deviates))
+    colnames(ttr) = paste("ttr", 1:n_sim, sep="")
+
+    # Append to the pop data and return
+    pop_ttr = data.frame(cbind(pop,ttr))
+    return(pop_ttr)
+
+} # end ttr_cox
+
+
+############################################################    
+## choose_ttr
+############################################################
+    
+# Select the method specified by the user to estimate time to recurrence
+
+choose_ttr <- function(choices, type) {
+    usercovars = choices[[1]]
+    usersims = choices[[2]]
+    userdistr = choices[[3]]
+    switch(type,
+        bootstrap = ttr_bootstrap(data=userdat, pop=pop1, 
+            covars=usercovars, n_sim=usersims),
+        parametric = ttr_param(data=userdat, pop=pop1, 
+            covars=usercovars, n_sim=usersims, distr=userdistr),
+        cox = ttr_cox(data=userdat, pop=pop1, 
+            covars=usercovars, n_sim=usersims)
+    )
+}
+
+    

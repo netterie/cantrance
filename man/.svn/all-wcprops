@@ -1,0 +1,491 @@
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man
+END
+calc_summ_by_groups.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_summ_by_groups.Rd
+END
+name_strata.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/name_strata.Rd
+END
+ggplot_ICER.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/ggplot_ICER.Rd
+END
+summarize_censored.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/summarize_censored.Rd
+END
+dist_range_unif.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/dist_range_unif.Rd
+END
+expand_dist_factor.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/expand_dist_factor.Rd
+END
+combine_tables.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/combine_tables.Rd
+END
+track_version.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/track_version.Rd
+END
+convert_HR.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/convert_HR.Rd
+END
+aggregate_by_indicator.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/aggregate_by_indicator.Rd
+END
+sim_parametric_survreg.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/sim_parametric_survreg.Rd
+END
+head2dim.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/head2dim.Rd
+END
+aggregate_by_indicator_and_year.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 106
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/aggregate_by_indicator_and_year.Rd
+END
+combinepops.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/combinepops.Rd
+END
+clinical_incidence.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/clinical_incidence.Rd
+END
+data_info.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/data_info.Rd
+END
+convert_to_years.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/convert_to_years.Rd
+END
+calc_one_future_cost.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_one_future_cost.Rd
+END
+calc_costs_QALYs.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_costs_QALYs.Rd
+END
+rx_logit.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/rx_logit.Rd
+END
+expand_dist_continuous.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/expand_dist_continuous.Rd
+END
+makeCI.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/makeCI.Rd
+END
+extract_treatment.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/extract_treatment.Rd
+END
+summarize_ecdf.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/summarize_ecdf.Rd
+END
+shift_stage.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/shift_stage.Rd
+END
+add_agegroups.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/add_agegroups.Rd
+END
+expand_rangevar.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/expand_rangevar.Rd
+END
+str2df.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/str2df.Rd
+END
+bootstrap_shifted_stage.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 98
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/bootstrap_shifted_stage.Rd
+END
+ggplot_summary.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/ggplot_summary.Rd
+END
+recreate_pinsky_calc.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/recreate_pinsky_calc.Rd
+END
+head.list.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/head.list.Rd
+END
+get_lambda.Rd.edited
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/get_lambda.Rd.edited
+END
+create_pop_list.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/create_pop_list.Rd
+END
+calc_age_at_threshold.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_age_at_threshold.Rd
+END
+bootstrap_rows_list.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/bootstrap_rows_list.Rd
+END
+compile_list.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/compile_list.Rd
+END
+sim_same_qdistr.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/sim_same_qdistr.Rd
+END
+add_extra_data.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/add_extra_data.Rd
+END
+life_table.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/tor/group-etzioni/!svn/ver/3220/cantrance/Rpackage/trunk/cantrance/man/life_table.Rd
+END
+build_simpop.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/build_simpop.Rd
+END
+ggplot_acceptability.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/ggplot_acceptability.Rd
+END
+summarize_cmprsk.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/summarize_cmprsk.Rd
+END
+recreate_simdata.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/recreate_simdata.Rd
+END
+calc_pys.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_pys.Rd
+END
+cancer_death.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/cancer_death.Rd
+END
+pop_variable_present.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/pop_variable_present.Rd
+END
+comparevals.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/comparevals.Rd
+END
+summarize_surv_types.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/summarize_surv_types.Rd
+END
+get_lambda.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/get_lambda.Rd
+END
+biomarker_trajectory.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/biomarker_trajectory.Rd
+END
+sim_piecewiseexp_HRs_restrictedrange.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 111
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/sim_piecewiseexp_HRs_restrictedrange.Rd
+END
+calc_ac_lifespan_convert.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 99
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_ac_lifespan_convert.Rd
+END
+calc_HR.Rd.edited
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_HR.Rd.edited
+END
+summarize_test_outcomes.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 98
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/summarize_test_outcomes.Rd
+END
+random_rows.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/random_rows.Rd
+END
+sim_same_qexp.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/sim_same_qexp.Rd
+END
+baseplot_timetoevent.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/baseplot_timetoevent.Rd
+END
+get_param.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/get_param.Rd
+END
+get_surv_summ.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/get_surv_summ.Rd
+END
+calc_and_sim_parametric.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 98
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/calc_and_sim_parametric.Rd
+END
+calc_ac_lifespan_pop.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_ac_lifespan_pop.Rd
+END
+calc_ICER.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_ICER.Rd
+END
+calc_and_sim_Cox.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/calc_and_sim_Cox.Rd
+END
+summarize_sims.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/summarize_sims.Rd
+END
+calc_surv_stat.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_surv_stat.Rd
+END
+sim_piecewiseexp_HRs.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/sim_piecewiseexp_HRs.Rd
+END
+sim_KM.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/sim_KM.Rd
+END
+merge_preserve_sort.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/merge_preserve_sort.Rd
+END
+calc_one_future_cost_indicator.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 105
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_one_future_cost_indicator.Rd
+END
+calc_and_sim_KM.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/calc_and_sim_KM.Rd
+END
+bootstrap_var.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/bootstrap_var.Rd
+END
+rx_bootstrap.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/rx_bootstrap.Rd
+END
+calc_ac_lifespan.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/calc_ac_lifespan.Rd
+END
+cantrance-package.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/cantrance-package.Rd
+END
+bootstrap_rows.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/bootstrap_rows.Rd
+END
+str2vec.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/str2vec.Rd
+END
+rbind_list.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/rbind_list.Rd
+END
+bootstrap_pop.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/man/bootstrap_pop.Rd
+END
+calc_HR.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/calc_HR.Rd
+END
+group_ages.Rd
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/tor/group-etzioni/!svn/ver/3573/cantrance/Rpackage/trunk/cantrance/man/group_ages.Rd
+END

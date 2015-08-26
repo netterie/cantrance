@@ -1,0 +1,11 @@
+Package: cantrance
+Type: Package
+Title: Translates intermediate endpoints of cancer comparative effectiveness studies to effects on mortality
+Version: 1.1
+Date: 2012-11-08
+Author: Jeanette Birnbaum & Leslie Mallinger
+Maintainer: Jeanette Birnbaum <kurian@uw.edu>
+Description: Cancer comparative effectiveness studies often do not report mortality as a primary endpoint due to the length and expense of follow-up necessary. CANTRANce (Cancer Translation for Comparative Effectiveness) takes in comparative effectiveness studies with endpoints that precede mortality, asks for additional data from the literature or other studies, and projects from the study endpoint to mortality. 
+License: GPL-3
+Depends: ggplot2, survival, cmprsk, reshape, plyr, gridExtra, msm, xtable
+LazyLoad: yes

@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/tor/group-etzioni/!svn/ver/3595/cantrance/Rpackage/trunk/cantrance
+END
+TEST
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/tor/group-etzioni/!svn/ver/3220/cantrance/Rpackage/trunk/cantrance/TEST
+END
+DESCRIPTION
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/DESCRIPTION
+END
+Read-and-delete-me
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/tor/group-etzioni/!svn/ver/3220/cantrance/Rpackage/trunk/cantrance/Read-and-delete-me
+END
+NAMESPACE
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/tor/group-etzioni/!svn/ver/3466/cantrance/Rpackage/trunk/cantrance/NAMESPACE
+END
